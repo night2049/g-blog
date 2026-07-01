@@ -1,0 +1,36 @@
+{
+  "defaultSkin": "indigo",
+  "mains": {
+    "post": "main-post.html",
+    "page": "main-page.html",
+    "home": "main-list.html",
+    "archive": "main-list.html",
+    "tag": "main-list.html",
+    "dir": "main-list.html",
+    "tags": "main-tagcloud.html",
+    "error": "main-error.html"
+  },
+  "scripts": {
+    "home": ["browse.js", "app.js"],
+    "archive": ["browse.js", "archive.js"],
+    "tag": ["browse.js", "tag.js"],
+    "dir": ["browse.js", "dir.js"],
+    "tags": ["browse.js", "tags.js"]
+  },
+  "nav": [
+    { "label": "首页", "page": "home" },
+    { "label": "归档", "page": "archive" },
+    { "label": "目录", "page": "dir" },
+    { "label": "标签", "page": "tags" },
+    { "label": "关于", "page": "about" }
+  ],
+  "widgets": {
+    "post": ["reading-progress", "back-to-top", "back-to-home"],
+    "home": ["back-to-top"],
+    "archive": ["back-to-top", "back-to-home"],
+    "tag": ["back-to-top", "back-to-home"],
+    "dir": ["back-to-top", "back-to-home"],
+    "tags": ["back-to-top", "back-to-home"]
+  },
+  "assets": ["giscus-light.css", "giscus-dark.css", "favicon.svg"]
+}

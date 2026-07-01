@@ -1,0 +1,44 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+# 构建期生成的 tailwind 入口
+.build
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+# 本地 fixture 预览产物
+_preview
+# webview/CDP 调试残留
+.playwright-cli
+# 本机使用私有镜像, lockfile 含私有 URL; CI 经 bunfig 公共源解析
+bun.lock
+# Kiro IDE / 本地 AI 工具配置
+.kiro

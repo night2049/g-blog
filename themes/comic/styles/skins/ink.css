@@ -1,0 +1,107 @@
+/* comic 主题皮肤 ink (纸张/墨水): 浅色=暖白米纸 + 墨黑/墨蓝强调, 深色=炭黑夜纸 + 柔白强调.
+   仅定义令牌取值 (:root 浅色基准 + .dark 暗色), 不含结构规则 (结构见 layout.css).
+   覆盖配色子集 (字体族/颜色角色/表层/代码高亮/zoom-overlay/shadow); 纯尺寸令牌继承 contract 兜底.
+   字体不换: 沿用 default 的系统字体栈 (杜绝 web 字体下载与 FOUT). 代码高亮取暖纸 github / 暖夜 github-dark. */
+
+:root {
+  /* 字体族: 与 default 一致的系统字体栈 (本主题不引入任何 web 字体). */
+  --gb-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --gb-font-display: var(--gb-font-body);
+  --gb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* 颜色角色 (浅色 A1 双色版式: 墨黑作主强调与描边同源, 朱砂作点睛色 / 错误同源).
+     强调色不再用冷工程蓝 (与暖白米纸色温冲突), 改取与描边深一档的墨黑, 链接/导航/按钮一律墨黑,
+     仅在阅读进度条/复制成功/代码 number token 等极小局部用朱砂 accent 提识别度. */
+  --gb-primary: #2a241b; /* 墨黑: 链接/导航当前/正文按钮 (与描边同源, 漫画"日式黑墨"主调) */
+  --gb-on-primary: #faf6ee; /* 主色块上文字 = 纸白 */
+  --gb-primary-container: #efe9dc;
+  --gb-on-primary-container: #2a241b;
+  --gb-secondary: #6b6253; /* 墨灰 */
+  --gb-on-secondary: #faf6ee;
+  --gb-accent: #b5341f; /* 朱砂点睛: 阅读进度/复制成功态/代码 number; 与 error 同源不撞色, 分场景互不重叠 */
+  --gb-on-accent: #faf6ee;
+  --gb-error: #b5341f; /* 朱红墨 (与 accent 同源, 错误场景与点睛场景不会同时出现, 共用值) */
+  --gb-on-error: #faf6ee;
+  --gb-outline: #5c5446; /* 墨线主描边 (layout.css 手绘描边用它, 较粗实色) */
+  --gb-outline-variant: #c8bca4; /* 浅墨灰: 次级分隔/hairline */
+
+  /* 表层: 暖白米纸基底, 卡片底取略深一档纸色, 与墨线描边共同勾出"纸片"层次. */
+  --gb-surface: #faf6ee;
+  --gb-surface-dim: #f1ebdd;
+  --gb-surface-bright: #fffdf8;
+  --gb-surface-container-lowest: #fffdf8;
+  --gb-surface-container-low: #f6f0e4; /* 卡片底纸 */
+  --gb-surface-container: #f1eadb;
+  --gb-surface-container-high: #eadfca; /* hover */
+  --gb-surface-container-highest: #e0d4ba; /* 弹层 */
+  --gb-on-surface: #1f1b16; /* 墨黑正文 */
+  --gb-on-surface-variant: #6b6253; /* 墨灰次要文字 */
+
+  /* 灯箱遮罩: 半透墨色 */
+  --gb-zoom-overlay: rgba(31, 27, 22, 0.74);
+
+  /* 阴影: 暖墨色调极弱投影 (纸张悬浮感) */
+  --gb-shadow-1: 0 1px 2px rgba(31, 27, 22, 0.08);
+  --gb-shadow-2: 0 6px 24px rgba(31, 27, 22, 0.14);
+  --gb-shadow-paper: 0 1px 2px rgba(31, 27, 22, 0.05),
+    0 6px 22px rgba(31, 27, 22, 0.08);
+
+  /* 代码高亮: 暖纸底 + github 浅色系 token, 关键字朱红 + number 取暖棕 (原冷蓝 #234b6e 与暖纸色温冲突) */
+  --gb-hl-bg: #f2ead9;
+  --gb-hl-fg: #2d2a24;
+  --gb-hl-comment: #8a7f6d;
+  --gb-hl-keyword: #b5341f;
+  --gb-hl-func: #7a4f9e;
+  --gb-hl-string: #2f6b3d;
+  --gb-hl-number: #a85a1f; /* 暖棕墨水 (与 variable 同源, number/variable 共用暖色) */
+  --gb-hl-variable: #a85a1f;
+  --gb-hl-section: #2f6b3d;
+}
+
+/* 暗色: 深褐炭黑夜纸. 纸面极暗, 层级靠容器提色 + 提亮墨线描边代偿 (暗底投影不可见);
+   on-surface 取柔白降眩光, 强调改提亮墨蓝; 代码块底贴近纸面, token 取暖调 github-dark. */
+.dark {
+  --gb-primary: #ece3d2; /* 提亮纸白 (与 on-surface 同源, 与浅色"墨黑"对称) */
+  --gb-on-primary: #15120e;
+  --gb-primary-container: #3a342a;
+  --gb-on-primary-container: #ece3d2;
+  --gb-secondary: #b3a690;
+  --gb-on-secondary: #15120e;
+  --gb-accent: #e08a6f; /* 暖朱砂提亮 (暗底下保留点睛识别度) */
+  --gb-on-accent: #15120e;
+  --gb-error: #e08a6f;
+  --gb-on-error: #15120e;
+  --gb-outline: #8c8169; /* 提亮墨线描边 (暗底勾边主力) */
+  --gb-outline-variant: #3a342a;
+
+  --gb-surface: #15120e; /* 炭黑夜纸 */
+  --gb-surface-dim: #100d0a;
+  --gb-surface-bright: #2a251d;
+  --gb-surface-container-lowest: #100d09;
+  --gb-surface-container-low: #1b1711; /* 卡片底纸 */
+  --gb-surface-container: #211c15;
+  --gb-surface-container-high: #2a241b;
+  --gb-surface-container-highest: #352e22;
+  --gb-on-surface: #ece3d2; /* 柔白 */
+  --gb-on-surface-variant: #b3a690;
+
+  /* 灯箱遮罩: 暗色下更深 */
+  --gb-zoom-overlay: rgba(0, 0, 0, 0.9);
+
+  --gb-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --gb-shadow-2: 0 6px 24px rgba(0, 0, 0, 0.72);
+  --gb-shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 22px rgba(0, 0, 0, 0.6);
+
+  /* 代码高亮: 暖调 github-dark, 底色贴近夜纸; number 改暖棕避免冷蓝在暖夜纸上跳色 */
+  --gb-hl-bg: #1b1711;
+  --gb-hl-fg: #d8cfbd;
+  --gb-hl-comment: #8a8069;
+  --gb-hl-keyword: #ff9b8a;
+  --gb-hl-func: #c9a8ff;
+  --gb-hl-string: #9fd6a8;
+  --gb-hl-number: #e0b070;
+  --gb-hl-variable: #e0b070;
+  --gb-hl-section: #9fd6a8;
+}

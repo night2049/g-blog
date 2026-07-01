@@ -1,0 +1,12 @@
+{
+  "build": {
+    "publishedLabel": "published",
+    "metaMarker": "meta",
+    "pageLabel": "page",
+    "dirPrefix": "dir",
+    "postDir": "post",
+    "contentDir": "content",
+    "excludedLabels": []
+  },
+  "pagination": { "home": 10, "archive": 100, "directory": 10, "tag": 10 }
+}

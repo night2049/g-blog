@@ -1,0 +1,11 @@
+{
+  "theme": { "name": "default", "skin": "indigo" },
+  "logo": { "type": "text", "value": "My Blog" },
+  "links": [{ "label": "GitHub", "href": "https://github.com/your-name" }],
+  "footer": {
+    "copyright": "© 2026 Your Name",
+    "icp": "",
+    "police": "",
+    "policeCode": ""
+  }
+}

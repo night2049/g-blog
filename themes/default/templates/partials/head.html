@@ -1,0 +1,128 @@
+<meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{pageTitle}}</title>
+    {{metaDescription}}
+    {{ogTags}}
+    {{canonical}}
+    {{jsonLd}}
+    {{katexCss}}
+    <link rel="icon" type="image/svg+xml" href="{{rootPrefix}}favicon.svg" />
+    <!-- 字体: 全部使用系统字体栈 (不加载 web 字体, 不连第三方 CDN); 字体族见皮肤 --gb-font-*. -->
+    {{headExtra}}
+    {{contentFlags}}
+    <script>
+      // chrome.json 尽早取数 kickoff: head 解析阶段即发起 (<html data-root> 此时已解析),
+      // 与 CSS/脚本并行; chrome.js 优先消费此 promise. 失败兜底 null + 空 catch 防未处理拒绝.
+      window.__chrome = fetch((document.documentElement.dataset.root || "./") + "chrome.json").then(function (r) { return r.json(); }).catch(function () { return null; });
+      // 主题脚本 (单一来源): 无闪烁 (首帧前设 .dark) + 单按钮三态循环 (浅/深/跟随系统)
+      // + giscus 主题联动 + 导航当前项高亮. 内联于此, 各页共用.
+      (function () {
+        var KEY = "theme";
+        function stored() {
+          try {
+            return localStorage.getItem(KEY);
+          } catch (e) {
+            return null;
+          }
+        }
+        function mode() {
+          return stored() || "system";
+        }
+        function sysDark() {
+          return (
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+          );
+        }
+        function isDark(m) {
+          return m === "dark" || (m !== "light" && sysDark());
+        }
+        function apply() {
+          var m = mode(),
+            dark = isDark(m);
+          document.documentElement.classList.toggle("dark", dark);
+          // data-theme 早于首帧设于 <html>: 主题钮图标改由 CSS (.theme-toggle::before) 按此渲染,
+          // 首帧即正确, 不再 JS 改 textContent (按钮此刻尚未解析, 改了也只能在 DOMContentLoaded 后生效 -> 图标切换/抖动).
+          document.documentElement.dataset.theme = m;
+          var f = document.querySelector("iframe.giscus-frame");
+          if (f && f.contentWindow)
+            f.contentWindow.postMessage(
+              { giscus: { setConfig: { theme: dark ? "{{giscusThemeDark}}" : "{{giscusThemeLight}}" } } },
+              "https://giscus.app",
+            );
+        }
+        apply(); // 首帧前应用: 设 .dark 避免闪白, 设 data-theme 使主题钮图标首帧即正确
+        function cycle() {
+          // 始终切到与"当前外观"相反的模式: 当前显示浅色就切深色, 反之亦然.
+          // 这样无论当前是显式 light/dark 还是跟随系统, 一次点击必定换色, 不会出现"点一下没反应".
+          var next = isDark(mode()) ? "light" : "dark";
+          try {
+            localStorage.setItem(KEY, next);
+          } catch (e) {}
+          apply();
+        }
+        // 导航当前项: 比对路径末段与导航链接末段, 命中加 aria-current=page (静态外壳无法预知当前页, 故客户端标记).
+        function markCurrentNav() {
+          var path = location.pathname.split("/").pop() || "index.html";
+          var links = document.querySelectorAll(".site-nav a");
+          for (var i = 0; i < links.length; i++) {
+            var href = (links[i].getAttribute("href") || "").split("/").pop();
+            if (href && href === path)
+              links[i].setAttribute("aria-current", "page");
+          }
+        }
+        // 吸顶顶栏的移动端行为: 下滚隐藏, 上滚/置顶显示; 桌面端始终常驻(移除 is-hidden).
+        function setupStickyHeader() {
+          var header = document.querySelector(".site-header");
+          if (!header) return;
+          var lastY = window.scrollY || 0;
+          var ticking = false;
+          function update() {
+            ticking = false;
+            var y = window.scrollY || 0;
+            // 滚动后顶栏变浮动大圆角卡片(桌面+移动都生效)
+            header.classList.toggle("is-scrolled", y > 4);
+            var mobile = window.matchMedia("(max-width: 767px)").matches;
+            if (!mobile) {
+              header.classList.remove("is-hidden");
+            } else if (y <= 8 || y < lastY - 4) {
+              header.classList.remove("is-hidden"); // 置顶或上滚 -> 显示
+            } else if (y > lastY + 6) {
+              header.classList.add("is-hidden"); // 下滚 -> 隐藏
+            }
+            lastY = y;
+          }
+          window.addEventListener(
+            "scroll",
+            function () {
+              if (!ticking) {
+                ticking = true;
+                requestAnimationFrame(update);
+              }
+            },
+            { passive: true },
+          );
+        }
+        document.addEventListener("DOMContentLoaded", function () {
+          var btn = document.getElementById("theme-toggle");
+          if (btn) btn.addEventListener("click", cycle);
+          markCurrentNav();
+          setupStickyHeader();
+          apply();
+        });
+        // 导航由 chrome.js 运行时注入: 注入完成后 (chrome:ready) 重跑当前项高亮.
+        document.addEventListener("chrome:ready", markCurrentNav);
+        if (window.matchMedia)
+          window
+            .matchMedia("(prefers-color-scheme: dark)")
+            .addEventListener("change", function () {
+              if (mode() === "system") apply();
+            });
+        window.addEventListener("message", function (e) {
+          if (e.origin === "https://giscus.app" && e.data && e.data.giscus)
+            apply();
+        });
+      })();
+    </script>
+    <!-- app.css 置于内联脚本之后: 内联 kickoff/无闪烁脚本不被样式表加载阻塞 (规范: CSS 后的脚本须等样式表), 确保 fetch 最早发起. -->
+    <link rel="stylesheet" href="{{rootPrefix}}app.css" />

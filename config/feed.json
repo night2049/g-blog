@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "formats": ["rss", "atom", "json"],
+  "count": 10,
+  "summaryLength": 255
+}

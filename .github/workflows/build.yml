@@ -1,0 +1,68 @@
+name: build
+on:
+  issues:
+    types: [opened, edited, closed, reopened, deleted, labeled, unlabeled]
+  push:
+    branches: [main]
+    paths:
+      - "content/**"
+      - "themes/**"
+      - "config/**"
+      - "src/**"
+      - "scripts/**"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "强制全量重建 (true/false)"
+        required: false
+        default: "false"
+# full/incremental 需读 issue; reassemble 仅推站点仓 (Deploy Key).
+permissions:
+  contents: read
+  issues: read
+# 串行, 勿取消进行中的部署.
+concurrency:
+  group: site-deploy
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout content repo
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0 # 需完整历史以 git diff before..after 算 changedPaths
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+      - run: bun install
+      - name: Checkout site repo via deploy key
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: your-name/your-site-repo
+          ssh-key: ${{ secrets.BLOG_DEPLOY_KEY }}
+          path: site
+      - name: Build (策略由 decideStrategy 自动判定)
+        env:
+          SITE_DIR: site
+          CONTENT_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONTENT_PAT: ${{ secrets.CONTENT_PAT }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          DIFF_BASE: ${{ github.event.before }}
+          DIFF_HEAD: ${{ github.sha }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.full }}" = "true" ]; then ARGS="--full"; fi
+          bun scripts/build.ts $ARGS
+      - name: Commit and push to site repo
+        working-directory: site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "build: ${{ github.event_name }}"
+          git pull --rebase --autostash
+          git push

@@ -1,0 +1,99 @@
+/* 默认皮肤 (文件名沿用 indigo, 取值已改为单色): 浅色=白底+纯黑强调, 深色=纯黑底+纯白强调.
+   仅定义令牌取值 (:root 浅色基准 + .dark 纯黑暗色), 不含结构规则.
+   换皮肤 = 在 skins/ 下新建同结构令牌文件, 把 config.appearance.theme.skin 指向它.
+   字体族归皮肤 (族值在此, <link> 在 head.html); 代码高亮取 github / github-dark. */
+
+:root {
+  /* 字体族: 全部用系统字体栈 (不加载任何 web 字体), 杜绝 FOUT/字重跳变并省去字体下载.
+     正文/UI 走各平台默认无衬线 + 系统中文 (PingFang/微软雅黑); 代码走平台等宽字体. */
+  --gb-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --gb-font-display: var(--gb-font-body);
+  --gb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* 颜色角色 (浅色基准: 白底 + 纯黑强调; 中性灰阶, 无彩色主色) */
+  --gb-primary: #000000;
+  --gb-on-primary: #ffffff;
+  --gb-primary-container: #f4f4f5;
+  --gb-on-primary-container: #18181b;
+  --gb-secondary: #71717a;
+  --gb-on-secondary: #ffffff;
+  --gb-error: #dc2626;
+  --gb-on-error: #ffffff;
+  --gb-outline: #d4d4d8;
+  --gb-outline-variant: #e8e8ea;
+
+  /* 表层: 纯白基底, 卡片同为纯白靠 1px hairline 描边分层 (对标暗色纯黑 + #262626 描边);
+     仅 hover/弹层用极浅中性灰, 不引入多级灰底. */
+  --gb-surface: #ffffff;
+  --gb-surface-dim: #ffffff;
+  --gb-surface-bright: #ffffff;
+  --gb-surface-container-lowest: #ffffff;
+  --gb-surface-container-low: #ffffff;
+  --gb-surface-container: #ffffff;
+  --gb-surface-container-high: #f4f4f5;
+  --gb-surface-container-highest: #e4e4e7;
+  --gb-on-surface: #18181b;
+  --gb-on-surface-variant: #71717a;
+
+  /* 灯箱遮罩: 浅色用半透深灰黑 */
+  --gb-zoom-overlay: rgba(24, 24, 27, 0.72);
+
+  --gb-shadow-1: 0 1px 2px rgba(24, 24, 27, 0.05);
+  --gb-shadow-2: 0 6px 24px rgba(24, 24, 27, 0.08);
+
+  /* 代码高亮: github 浅色 token, 底色取极浅中性灰与纯白卡协调 */
+  --gb-hl-bg: #fafafa;
+  --gb-hl-fg: #24292e;
+  --gb-hl-comment: #6a737d;
+  --gb-hl-keyword: #d73a49;
+  --gb-hl-func: #6f42c1;
+  --gb-hl-string: #032f62;
+  --gb-hl-number: #005cc5;
+  --gb-hl-variable: #e36209;
+  --gb-hl-section: #22863a;
+}
+
+/* 纯黑暗色: 纯黑上阴影不可见, 层级改用容器提色 + 1px #262626 细描边;
+   on-surface 用柔白 (#ededed) 降眩光, 强调 primary 用纯白 (#ffffff); 代码块底 #0d0d0d 与纯黑协调. */
+.dark {
+  --gb-primary: #ffffff;
+  --gb-on-primary: #000000;
+  --gb-primary-container: #1a1a1a;
+  --gb-on-primary-container: #ededed;
+  --gb-secondary: #94a3b8;
+  --gb-on-secondary: #0b0b0b;
+  --gb-error: #f87171;
+  --gb-on-error: #0b0b0b;
+  --gb-outline: #3a3a3a;
+  --gb-outline-variant: #262626;
+
+  --gb-surface: #000000;
+  --gb-surface-dim: #000000;
+  --gb-surface-bright: #1a1a1a;
+  --gb-surface-container-lowest: #000000;
+  --gb-surface-container-low: #0a0a0a;
+  --gb-surface-container: #121212;
+  --gb-surface-container-high: #1a1a1a;
+  --gb-surface-container-highest: #222222;
+  --gb-on-surface: #ededed;
+  --gb-on-surface-variant: #a1a1aa;
+
+  /* 灯箱遮罩: 纯黑暗色下更深, 凸显悬浮图 */
+  --gb-zoom-overlay: rgba(0, 0, 0, 0.88);
+
+  --gb-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --gb-shadow-2: 0 6px 24px rgba(0, 0, 0, 0.7);
+
+  /* 代码高亮: github-dark, 底色调到 #0d0d0d 与纯黑协调 */
+  --gb-hl-bg: #0d0d0d;
+  --gb-hl-fg: #c9d1d9;
+  --gb-hl-comment: #8b949e;
+  --gb-hl-keyword: #ff7b72;
+  --gb-hl-func: #d2a8ff;
+  --gb-hl-string: #a5d6ff;
+  --gb-hl-number: #79c0ff;
+  --gb-hl-variable: #ffa657;
+  --gb-hl-section: #7ee787;
+}

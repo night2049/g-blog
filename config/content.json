@@ -1,0 +1,16 @@
+{
+  "toc": { "enabled": true, "minHeadings": 2, "pcCollapseBelow": 5 },
+  "readingTime": { "enabled": true, "cpm": 400, "wpm": 250 },
+  "summary": { "enabled": true, "length": 120 },
+  "cover": { "enabled": true },
+  "math": { "enabled": true },
+  "codeCopy": { "enabled": true },
+  "imageZoom": { "enabled": true },
+  "share": { "enabled": true, "networks": ["copy", "x", "telegram", "weibo"] },
+  "widgets": { "enabled": true },
+  "og": { "enabled": true },
+  "canonical": { "enabled": true },
+  "jsonLd": { "enabled": true },
+  "webp": { "enabled": true, "quality": 80 },
+  "errorPages": { "codes": [404, 403, 500] }
+}
