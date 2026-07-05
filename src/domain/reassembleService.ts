@@ -18,6 +18,7 @@ import { renderPageHtml, renderStandalonePageHtml, renderListPage } from "./temp
 import { LIST_PAGES, cleanThemeAssets, copyThemeAssets, writeChromeJson } from "./siteService.ts";
 import { errorPagesToWrite, renderErrorPage } from "./errorService.ts";
 import { toChromeData } from "./themeService.ts";
+import { removeFeeds } from "./feedService.ts";
 
 export interface ReassembleDeps {
   fs: FileStore; // 站点目录 (含已渲染产物)
@@ -133,10 +134,12 @@ export function reassembleAll(deps: ReassembleDeps): ReassembleResult {
 
   // 运行时外壳片段: 重写 chrome.json (外壳变更经此生效, 文章/独立页指纹不变).
   writeChromeJson(fs, toChromeData(chrome, cfg.site.title));
+  if (!cfg.rss.enabled) removeFeeds(fs);
 
-  // 切主题残留清理: 先删站点根顶层旧主题脚本/样式 (含上个主题的 comic-*.js 等), 再重拷当前主题资产.
-  // app.css 由 build 末尾 compileCss 重写; HTML/data/图片子目录不受影响 (cleanThemeAssets 仅动顶层 js/css).
-  cleanThemeAssets(fs);
+  // 切主题残留清理: 先删站点根顶层已知主题/runtime 资产, 再重拷当前主题资产.
+  // app.css 由 build 末尾 compileCss 重写; HTML/data/图片子目录不受影响.
+  // cleanThemeAssets 仅动顶层已知 runtime/theme 资产与当前 manifest 资产, 不按扩展名清用户根级资源.
+  cleanThemeAssets(fs, manifest);
   // 刷新主题静态资产 (客户端脚本 + giscus 主题 CSS 等); 内容不变时 copyInto 不产生 git diff.
   copyThemeAssets(fs, assetsDir, manifest);
 

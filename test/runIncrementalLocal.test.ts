@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { runIncrementalLocal } from "../src/app/runIncrementalLocal.ts";
-import { hashUrl } from "../src/domain/imageService.ts";
+import { hashLocalImage } from "../src/domain/imageService.ts";
 import {
   memFileStore,
   fakeMarkdown,
@@ -156,7 +156,10 @@ describe("runIncrementalLocal 本地图", () => {
     const fs = memFileStore();
     const picBytes = new Uint8Array([5, 5]);
     const reader = (_dir: string): ImageDownloader => ({
-      download: async (s) => (s === "a.png" ? { bytes: picBytes, ext: "png" } : null),
+      download: async (s) =>
+        s === "a.png"
+          ? { bytes: picBytes, ext: "png", sourceBytes: picBytes, sourceExt: "png" }
+          : null,
     });
     const issue = makeIssue({
       node_id: "img1",
@@ -166,9 +169,35 @@ describe("runIncrementalLocal 本地图", () => {
     });
     await run(fs, { upserts: [lp(issue)], removes: [] }, reader);
     const d = fs.dump();
-    const name = `${hashUrl("a.png")}.png`;
+    const name = `${hashLocalImage(picBytes, "png", cfg.content.webp)}.png`;
     expect(d["post/img1.html"]).toContain(`img1/${name}`);
     expect(fs.dumpBytes()[`post/img1/${name}`]).toEqual(picBytes);
+  });
+
+  test("md 重建且本地图源字节变化时引用新文件名", async () => {
+    const fs = memFileStore();
+    const oldBytes = new Uint8Array([1, 1]);
+    const newBytes = new Uint8Array([2, 2]);
+    const oldName = `${hashLocalImage(oldBytes, "png", cfg.content.webp)}.png`;
+    seedArticle(fs, "img2");
+    fs.writeBytes(`post/img2/${oldName}`, oldBytes);
+    const reader = (_dir: string): ImageDownloader => ({
+      download: async (s) =>
+        s === "a.png"
+          ? { bytes: newBytes, ext: "png", sourceBytes: newBytes, sourceExt: "png" }
+          : null,
+    });
+    const issue = makeIssue({
+      node_id: "img2",
+      title: "换图",
+      labels: [{ name: "published" }],
+      body: '<img src="a.png">正文',
+    });
+    await run(fs, { upserts: [lp(issue)], removes: [] }, reader);
+    const newName = `${hashLocalImage(newBytes, "png", cfg.content.webp)}.png`;
+    expect(fs.dump()["post/img2.html"]).toContain(`img2/${newName}`);
+    expect(fs.dump()["post/img2.html"]).not.toContain(`img2/${oldName}`);
+    expect(fs.dumpBytes()[`post/img2/${newName}`]).toEqual(newBytes);
   });
 });
 

@@ -16,6 +16,7 @@ import { createFileStore } from "../src/infra/fileStore.ts";
 import { createEventSource } from "../src/infra/eventPayload.ts";
 import { createGitHubApi } from "../src/infra/githubApi.ts";
 import { createImageDownloader, createLocalImageReader } from "../src/infra/imageDownloader.ts";
+import { createGitHubIssueAttachmentResolutionRules } from "../src/infra/githubAttachmentRules.ts";
 import { listLocalPosts, listChangedLocalPosts } from "../src/infra/localMarkdownSource.ts";
 import { createTemplateProvider } from "../src/infra/templateProvider.ts";
 import { createFeedRenderer } from "../src/infra/feedRenderer.ts";
@@ -57,35 +58,50 @@ function withMath(base: Markdown): Markdown {
   };
 }
 
-// 事件文件是否含 issue 载荷 (区分 issues 事件与 push 事件; 解析失败按无载荷处理).
-function eventHasIssue(eventPath: string): boolean {
+export type EventPayloadResult =
+  | { ok: true; hasIssuePayload: boolean }
+  | { ok: false; reason: string };
+
+// 事件文件是否含 issue 载荷 (区分 issues 事件与 push 事件); 解析失败由策略 fail closed -> full.
+export function readEventPayload(eventPath: string | undefined): EventPayloadResult {
+  if (!eventPath) return { ok: true, hasIssuePayload: false };
   try {
     const payload = JSON.parse(readFileSync(eventPath, "utf8"));
-    return Boolean(payload && payload.issue);
-  } catch {
-    return false;
+    return { ok: true, hasIssuePayload: Boolean(payload && payload.issue) };
+  } catch (e) {
+    return { ok: false, reason: "事件 payload 解析失败: " + String(e) };
   }
 }
 
 // 本次 push 改动的一条文件记录: status (A/M/D 等单字母) + 仓库相对路径.
-interface ChangedFile {
+export interface ChangedFile {
   status: string;
   path: string;
 }
 
-// 用 git diff 算本次 push 改动 (DIFF_BASE..DIFF_HEAD), 带增删改状态供本地 md 增量.
-// 数组参数调用避免 shell 注入; 缺 ref/失败则置空. 重命名 (R) 拆为 "删旧 + 增新"; 复制 (C) 仅记新增.
-function computeChangedPaths(): ChangedFile[] {
-  const base = process.env.DIFF_BASE;
-  const head = process.env.DIFF_HEAD;
-  if (!base || !head) return [];
-  const proc = Bun.spawnSync(["git", "diff", "--name-status", base, head]);
-  if (proc.exitCode !== 0) {
-    console.log("[build] git diff 非零退出, changedPaths 置空");
-    return [];
-  }
+export type ChangedPathsResult =
+  | { ok: true; files: ChangedFile[] }
+  | { ok: false; reason: string };
+
+type SpawnForDiff = (cmd: string[]) => {
+  exitCode: number | null;
+  stdout: Uint8Array | ArrayBuffer | string;
+  stderr?: Uint8Array | ArrayBuffer | string;
+};
+
+function decodeOutput(out: Uint8Array | ArrayBuffer | string | undefined): string {
+  if (out === undefined) return "";
+  if (typeof out === "string") return out;
+  return new TextDecoder().decode(out);
+}
+
+function isAllZeroSha(s: string): boolean {
+  return /^0+$/.test(s);
+}
+
+export function parseChangedPathsNameStatus(text: string): ChangedFile[] {
   const out: ChangedFile[] = [];
-  for (const line of new TextDecoder().decode(proc.stdout).split("\n")) {
+  for (const line of text.split("\n")) {
     const t = line.replace(/\r$/, "");
     if (!t.trim()) continue;
     const cols = t.split("\t");
@@ -102,6 +118,29 @@ function computeChangedPaths(): ChangedFile[] {
     }
   }
   return out;
+}
+
+// 用 git diff 算本次 push 改动 (DIFF_BASE..DIFF_HEAD), 带增删改状态供本地 md 增量.
+// 数组参数调用避免 shell 注入; 缺 ref 返回 ok 空集. 失败返回结构化错误, 由策略 fail closed -> full.
+export function computeChangedPaths(
+  env: NodeJS.ProcessEnv = process.env,
+  spawn: SpawnForDiff = (cmd) => Bun.spawnSync(cmd),
+): ChangedPathsResult {
+  const base = env.DIFF_BASE;
+  const head = env.DIFF_HEAD;
+  if (!base || !head) return { ok: true, files: [] };
+  const cmd = isAllZeroSha(base)
+    ? ["git", "diff-tree", "--root", "--name-status", head]
+    : ["git", "diff", "--name-status", base, head];
+  const proc = spawn(cmd);
+  if (proc.exitCode !== 0) {
+    const err = decodeOutput(proc.stderr).trim();
+    return {
+      ok: false,
+      reason: "git diff 失败(exit=" + proc.exitCode + ")" + (err ? ": " + err : ""),
+    };
+  }
+  return { ok: true, files: parseChangedPathsNameStatus(decodeOutput(proc.stdout)) };
 }
 
 // 编译 CSS: buildCssEntry 写 .build/app.entry.css (相对 @source) -> tailwindcss 产出 <siteDir>/app.css.
@@ -159,7 +198,7 @@ async function prepareThemeAssets(
 }
 
 // 模板生产化: 把主题模板树递归拷到 outAbs, 其中 head.html 的内联 <script> 经 Bun minify 后回填.
-// 占位符 {{giscusThemeLight/Dark}} 位于字符串字面量内, 标准 minify 保留; {{headExtra}} 在 script 块外, 不受影响.
+// giscus 主题占位符位于字符串字面量内, 标准 minify 保留; {{headExtra}} 在 script 块外, 不受影响.
 // 放装配层 (非 domain): 下游 templateProvider 从 outAbs 读, 即得压缩版 head, 无需改 domain.
 async function prepareTemplates(srcAbs: string, outAbs: string): Promise<void> {
   const glob = new Bun.Glob("**/*");
@@ -294,6 +333,7 @@ async function main(argv: string[]): Promise<void> {
       fs,
       md,
       cfg,
+      repo: "fixture/local",
       templates,
       manifest: themeManifest,
       chrome,
@@ -325,8 +365,8 @@ async function main(argv: string[]): Promise<void> {
       assetsDir,
       feedRenderer,
       highlighter,
-      // 远程图: 联网时尝试下载 (无 token 走匿名), 失败保留原链接.
-      images: createImageDownloader(process.env.GITHUB_TOKEN, undefined, cfg.content.webp),
+      // 远程图: 本地预览只走匿名下载, 失败保留原链接.
+      images: createImageDownloader(undefined, undefined, cfg.content.webp),
       localPosts: listLocalPosts(cfg, rootBase),
       localImageReader: (dir) => createLocalImageReader(dir, cfg.content.webp),
     });
@@ -339,11 +379,20 @@ async function main(argv: string[]): Promise<void> {
   const siteDir = requireEnv("SITE_DIR");
   const fs = createFileStore(siteDir);
   const eventPath = process.env.GITHUB_EVENT_PATH;
-  const changedFiles = computeChangedPaths();
+  const eventResult = readEventPayload(eventPath);
+  const changedResult = computeChangedPaths();
+  const changedFiles = changedResult.ok ? changedResult.files : [];
+  if (!eventResult.ok)
+    console.log("[build] 事件 payload 解析失败, fail closed -> full: " + eventResult.reason);
+  if (!changedResult.ok)
+    console.log("[build] git diff 失败, fail closed -> full: " + changedResult.reason);
   const env: StrategyEnv = {
-    hasIssuePayload: eventPath ? eventHasIssue(eventPath) : false,
+    hasIssuePayload: eventResult.ok ? eventResult.hasIssuePayload : false,
+    eventPayloadOk: eventResult.ok,
     hasManifest: fs.exists("data/years.json"),
     changedPaths: changedFiles.map((f) => f.path),
+    changedPathsOk: changedResult.ok,
+    changedPathsError: changedResult.ok ? undefined : changedResult.reason,
     forceFull,
     contentDir: cfg.build.contentDir,
   };
@@ -371,22 +420,29 @@ async function main(argv: string[]): Promise<void> {
       process.env.CONTENT_PAT || requireEnv("GITHUB_TOKEN"),
       undefined,
       cfg.content.webp,
+      {
+        contentRepo: repo,
+        verifiedAttachmentRules: [],
+        githubAttachmentResolutionRules: createGitHubIssueAttachmentResolutionRules(repo),
+      },
     );
     localPosts = listLocalPosts(cfg, rootBase); // 双源: 本地 md 合并入全量
   } else if (strategy === "incremental") {
+    repo = requireEnv("CONTENT_REPO");
     events = createEventSource(requireEnv("GITHUB_EVENT_PATH"));
     images = createImageDownloader(
       process.env.CONTENT_PAT || process.env.GITHUB_TOKEN,
       undefined,
       cfg.content.webp,
+      {
+        contentRepo: repo,
+        verifiedAttachmentRules: [],
+        githubAttachmentResolutionRules: createGitHubIssueAttachmentResolutionRules(repo),
+      },
     );
   } else if (strategy === "incrementalLocal") {
-    // 本地 md 增量: 预算改动篇目; 远程图仍可能出现 (匿名/带 token 尝试).
-    images = createImageDownloader(
-      process.env.CONTENT_PAT || process.env.GITHUB_TOKEN,
-      undefined,
-      cfg.content.webp,
-    );
+    // 本地 md 增量: 预算改动篇目; 远程图仍可能出现, 但只允许匿名下载.
+    images = createImageDownloader(undefined, undefined, cfg.content.webp);
     localChanges = listChangedLocalPosts(changedFiles, cfg, rootBase);
   }
 
@@ -414,7 +470,9 @@ async function main(argv: string[]): Promise<void> {
   console.log("[build] 完成 -> " + siteDir);
 }
 
-main(process.argv.slice(2)).catch((e) => {
-  console.error("[build] 失败:", e);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main(process.argv.slice(2)).catch((e) => {
+    console.error("[build] 失败:", e);
+    process.exit(1);
+  });
+}

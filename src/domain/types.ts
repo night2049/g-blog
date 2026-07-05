@@ -194,6 +194,8 @@ export interface ChromeVars {
   rssLinks: string;
   giscusThemeLight: string; // giscus 浅色主题值 (自定义 CSS 的绝对 URL, 或内置 "light")
   giscusThemeDark: string; // giscus 深色主题值 (绝对 URL 或内置 "dark")
+  giscusThemeLightJs: string; // 上述值的 JS 字符串字面量, 供内联主题脚本使用
+  giscusThemeDarkJs: string; // 上述值的 JS 字符串字面量, 供内联主题脚本使用
   lang: string; // <html lang> 值 (源自 cfg.site.language, 缺省 zh-CN); 经各 render 的 ...chrome 注入 {{lang}}, 不写入 chrome.json
 }
 
@@ -263,8 +265,74 @@ writeBytes(rel: string, bytes: Uint8Array): void;
   clearExcept(keep: string[]): void;
 }
 
+export interface DownloadedImage {
+  bytes: Uint8Array;
+  ext: string;
+  width?: number;
+  height?: number;
+  sourceBytes?: Uint8Array;
+  sourceExt?: string;
+}
+
+export type ImageSource =
+  | { kind: "github-issue"; repo: string; issueNumber: number }
+  | { kind: "local-markdown" };
+
+export interface VerifiedAttachmentRule {
+  host: string;
+  pathPattern: RegExp;
+  sourceRepo: string;
+  authMode: "bearer" | "none";
+  evidence: {
+    issueNumber: number;
+    capturedAt: string;
+    urlShape: string;
+    anonymousStatus: number;
+    bearerStatus?: number;
+    sessionCookieStatus?: number;
+    authenticatedOk: boolean;
+  };
+}
+
+export interface GitHubAttachmentResolutionRule {
+  sourceRepo: string;
+  canonicalHost: string;
+  canonicalPathPattern: RegExp;
+  signedHost: string;
+  signedPathPattern: RegExp;
+  signedQueryParam: string;
+  evidence: {
+    verificationRepo: string;
+    issueNumber: number;
+    capturedAt: string;
+    canonicalUrlShape: string;
+    signedUrlShape: string;
+    signedUrlSamples: readonly {
+      source: string;
+      capturedAt: string;
+      host: string;
+      path: string;
+      queryParam: string;
+      contentTypeHint?: string;
+      jwtIssuer?: string;
+      jwtAudience?: string;
+      jwtNotBeforeUtc?: string;
+      jwtExpiresUtc?: string;
+    }[];
+    markdownApiStatus: number;
+    signedAnonymousStatus: number;
+  };
+}
+
+export interface ImageAuthPolicy {
+  token?: string;
+  contentRepo?: string;
+  verifiedAttachmentRules?: readonly VerifiedAttachmentRule[];
+  githubAttachmentResolutionRules?: readonly GitHubAttachmentResolutionRule[];
+}
+
 export interface ImageDownloader {
-download(url: string): Promise<{ bytes: Uint8Array; ext: string; width?: number; height?: number } | null>;
+download(url: string, source?: ImageSource): Promise<DownloadedImage | null>;
 }
 
 // 端口: 模板提供者. 按名取模板字符串, 解耦模板来源 (文件系统/内存/远程), 便于替换模板.

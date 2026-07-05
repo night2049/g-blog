@@ -47,6 +47,43 @@ test("mapIssue 容错: 字符串标签与缺省 body", () => {
     updated_at: "y",
   });
   expect(i.state).toBe("closed");
-  expect(i.labels[0].name).toBe("a");
+  expect(i.labels[0]!.name).toBe("a");
   expect(i.body).toBeNull();
+});
+
+test("mapIssue 过滤非法 label, 不生成 name=undefined", () => {
+  const i = mapIssue({
+    node_id: "I_e4",
+    number: 1,
+    title: "t",
+    state: "open",
+    labels: ["a", { name: "b" }, { name: 123 }, {}, null],
+    created_at: "x",
+    updated_at: "y",
+  });
+  expect(i.labels).toEqual([{ name: "a" }, { name: "b" }]);
+});
+
+test("mapIssue 缺关键字段时抛错", () => {
+  expect(() =>
+    mapIssue({
+      number: 1,
+      title: "t",
+      state: "open",
+      labels: [],
+      created_at: "x",
+      updated_at: "y",
+    }),
+  ).toThrow("node_id");
+  expect(() =>
+    mapIssue({
+      node_id: "I_bad",
+      number: "1",
+      title: "t",
+      state: "open",
+      labels: [],
+      created_at: "x",
+      updated_at: "y",
+    }),
+  ).toThrow("number");
 });

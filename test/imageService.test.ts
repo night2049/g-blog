@@ -2,6 +2,7 @@ import { test, expect, describe } from "bun:test";
 import {
   extractImageUrls,
   extractLocalImagePaths,
+  hashLocalImage,
   hashUrl,
   processImages,
   processLocalImages,
@@ -110,6 +111,21 @@ describe("processImages (分文件夹 + 判存跳过)", () => {
     expect(Object.keys(fs.dumpBytes()).length).toBe(0);
     expect("images.json" in fs.dump()).toBe(false);
   });
+
+  test("只改真实 img src, 不改 a href 或正文文本中的同 URL", async () => {
+    const fs = memFileStore();
+    const u = "https://x/a.png";
+    const dl = countingDownloader({ [u]: { bytes: b1, ext: "png" } });
+    const r = await processImages(
+      `<p>${u}</p><a href="${u}">原图</a><img src="${u}"><img src="${u}">`,
+      { downloader: dl, fs, imgDir, relPrefix },
+    );
+    const name = `${hashUrl(u)}.png`;
+    expect(r.html).toContain(`<p>${u}</p>`);
+    expect(r.html).toContain(`<a href="${u}">`);
+    expect((r.html.match(new RegExp(`src="${relPrefix}${name}"`, "g")) ?? []).length).toBe(2);
+    expect(dl.calls).toBe(1);
+  });
 });
 
 describe("processImages 尺寸汇出 (dims)", () => {
@@ -201,6 +217,8 @@ describe("extractLocalImagePaths", () => {
       '<img src="//cdn/d.png">', // 协议相对
       '<img src="/root.png">', // 根绝对
       '<img src="data:image/png;base64,xxx">', // data
+      '<img src="mailto:a@example.com">', // 非图片协议
+      '<img src="tel:+123">', // 非图片协议
     ].join("");
     expect(extractLocalImagePaths(html)).toEqual(["images/a.png", "./b.jpg"]);
   });
@@ -211,13 +229,30 @@ describe("extractLocalImagePaths", () => {
 
 // 本地图 reader: 按 relSrc -> {bytes,ext(,dims)} 映射; 未命中返回 null (模拟缺文件).
 function fakeLocalReader(
-  map: Record<string, { bytes: Uint8Array; ext: string; width?: number; height?: number }>,
+  map: Record<
+    string,
+    {
+      bytes: Uint8Array;
+      ext: string;
+      width?: number;
+      height?: number;
+      sourceBytes?: Uint8Array;
+      sourceExt?: string;
+    }
+  >,
 ): ImageDownloader & { calls: number } {
   const r = {
     calls: 0,
     download: async (relSrc: string) => {
       r.calls++;
-      return map[relSrc] ?? null;
+      const hit = map[relSrc];
+      return hit
+        ? {
+            ...hit,
+            sourceBytes: hit.sourceBytes ?? hit.bytes,
+            sourceExt: hit.sourceExt ?? hit.ext,
+          }
+        : null;
     },
   };
   return r;
@@ -236,7 +271,7 @@ describe("processLocalImages (本地相对图)", () => {
     });
     const html = '<img src="images/a.png"><img src="https://x/remote.png">';
     const r = await processLocalImages(html, { reader, fs, imgDir, relPrefix });
-    const name = `${hashUrl("images/a.png")}.png`;
+    const name = `${hashLocalImage(b1, "png")}.png`;
     expect(r.html).toContain(`src="${relPrefix}${name}"`);
     expect(r.html).toContain('src="https://x/remote.png"'); // 远程图原样保留
     expect(fs.dumpBytes()[`${imgDir}/${name}`]).toEqual(b1);
@@ -244,20 +279,48 @@ describe("processLocalImages (本地相对图)", () => {
     expect(reader.calls).toBe(1); // 远程图不进本通道
   });
 
-  test("判存跳过: imgDir 已有 <hash>.* 不重复读取", async () => {
+  test("判存跳过: imgDir 已有内容 hash 命中时不重复写入, 仍保留尺寸", async () => {
     const fs = memFileStore();
-    const name = `${hashUrl("images/a.png")}.png`;
+    const name = `${hashLocalImage(b1, "png")}.png`;
     fs.writeBytes(`${imgDir}/${name}`, b1);
-    const reader = fakeLocalReader({ "images/a.png": { bytes: b2, ext: "png" } });
+    const reader = fakeLocalReader({
+      "images/a.png": {
+        bytes: b2,
+        ext: "png",
+        sourceBytes: b1,
+        sourceExt: "png",
+        width: 320,
+        height: 180,
+      },
+    });
     const r = await processLocalImages('<img src="images/a.png">', {
       reader,
       fs,
       imgDir,
       relPrefix,
     });
-    expect(reader.calls).toBe(0);
+    expect(reader.calls).toBe(1);
     expect(r.html).toContain(`src="${relPrefix}${name}"`);
     expect(fs.dumpBytes()[`${imgDir}/${name}`]).toEqual(b1); // 未覆盖
+    expect(r.dims[`${relPrefix}${name}`]).toEqual({ width: 320, height: 180 });
+  });
+
+  test("判存必须精确到输出扩展名, 不用同 hash 旧扩展误命中", async () => {
+    const fs = memFileStore();
+    const hash = hashLocalImage(b1, "png");
+    fs.writeBytes(`${imgDir}/${hash}.png`, b1);
+    const reader = fakeLocalReader({
+      "images/a.png": { bytes: b2, ext: "webp", sourceBytes: b1, sourceExt: "png" },
+    });
+    const r = await processLocalImages('<img src="images/a.png">', {
+      reader,
+      fs,
+      imgDir,
+      relPrefix,
+    });
+    expect(r.html).toContain(`src="${relPrefix}${hash}.webp"`);
+    expect(fs.dumpBytes()[`${imgDir}/${hash}.png`]).toEqual(b1);
+    expect(fs.dumpBytes()[`${imgDir}/${hash}.webp`]).toEqual(b2);
   });
 
   test("reader 返回 null (缺文件) 保留原链接", async () => {
@@ -280,6 +343,68 @@ describe("processLocalImages (本地相对图)", () => {
     const html = '<p>引用 a.png 文件</p><img src="a.png">';
     const r = await processLocalImages(html, { reader, fs, imgDir, relPrefix });
     expect(r.html).toContain("<p>引用 a.png 文件</p>"); // 正文未被改写
-    expect(r.html).toContain(`src="${relPrefix}${hashUrl("a.png")}.png"`);
+    expect(r.html).toContain(`src="${relPrefix}${hashLocalImage(b1, "png")}.png"`);
+  });
+
+  test("reader 缺 sourceBytes/sourceExt 时 fail closed 保留原链接", async () => {
+    const fs = memFileStore();
+    const reader: ImageDownloader = {
+      download: async () => ({ bytes: b1, ext: "png" }),
+    };
+    const r = await processLocalImages('<img src="a.png">', {
+      reader,
+      fs,
+      imgDir,
+      relPrefix,
+    });
+    expect(r.html).toContain('src="a.png"');
+    expect(r.assets).toEqual([]);
+    expect(Object.keys(fs.dumpBytes()).length).toBe(0);
+  });
+
+  test("同一路径不同源字节生成不同文件名", async () => {
+    const name1 = `${hashLocalImage(b1, "png")}.png`;
+    const name2 = `${hashLocalImage(b2, "png")}.png`;
+    expect(name1).not.toBe(name2);
+  });
+
+  test("同源字节命中缓存不覆盖既有文件", async () => {
+    const fs = memFileStore();
+    const name = `${hashLocalImage(b1, "png")}.png`;
+    fs.writeBytes(`${imgDir}/${name}`, b1);
+    const reader = fakeLocalReader({
+      "same.png": { bytes: b2, ext: "png", sourceBytes: b1, sourceExt: "png" },
+    });
+    const r = await processLocalImages('<img src="same.png">', {
+      reader,
+      fs,
+      imgDir,
+      relPrefix,
+    });
+    expect(reader.calls).toBe(1);
+    expect(r.html).toContain(`src="${relPrefix}${name}"`);
+    expect(fs.dumpBytes()[`${imgDir}/${name}`]).toEqual(b1);
+  });
+
+  test("webp quality 变化会生成不同文件名", async () => {
+    const fs = memFileStore();
+    const reader = fakeLocalReader({ "a.png": { bytes: b1, ext: "webp", sourceBytes: b1, sourceExt: "png" } });
+    const r80 = await processLocalImages('<img src="a.png">', {
+      reader,
+      fs,
+      imgDir,
+      relPrefix,
+      webp: { enabled: true, quality: 80 },
+    });
+    const r90 = await processLocalImages('<img src="a.png">', {
+      reader,
+      fs,
+      imgDir,
+      relPrefix,
+      webp: { enabled: true, quality: 90 },
+    });
+    expect(r80.html).toContain(`${hashLocalImage(b1, "png", { enabled: true, quality: 80 })}.webp`);
+    expect(r90.html).toContain(`${hashLocalImage(b1, "png", { enabled: true, quality: 90 })}.webp`);
+    expect(r80.html).not.toBe(r90.html);
   });
 });

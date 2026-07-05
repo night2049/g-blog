@@ -41,7 +41,7 @@ export function protectMath(md: string): { md: string; tokens: MathToken[] } {
     return mathPlaceholder(tokens.length - 1);
   });
   masked = masked.replace(
-    /\$(?!\s)((?:\\\$|[^$\n])+?)(?<!\s)\$/g,
+    /(?<![\\A-Za-z0-9])\$(?!\s)((?:\\\$|[^$\n])+?)(?<!\s)\$(?![A-Za-z0-9])/g,
     (_m, tex: string) => {
       tokens.push({ tex: tex.trim(), display: false });
       return mathPlaceholder(tokens.length - 1);

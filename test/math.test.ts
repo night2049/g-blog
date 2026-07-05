@@ -33,6 +33,22 @@ describe("protectMath", () => {
     expect(tokens).toEqual([]);
     expect(md).toBe("普通文字, 价格说明无 $ 符号");
   });
+
+  test("货币文本不被误判为行内公式", () => {
+    expect(protectMath("价格$5和$10").tokens).toEqual([]);
+    expect(protectMath("USD $5 and $10").tokens).toEqual([]);
+  });
+
+  test("正常行内公式仍识别", () => {
+    expect(protectMath("这是 $x_i$ 公式").tokens).toEqual([
+      { tex: "x_i", display: false },
+    ]);
+    expect(protectMath("$x+y$").tokens).toEqual([{ tex: "x+y", display: false }]);
+  });
+
+  test("转义美元不识别为公式", () => {
+    expect(protectMath("\\$5").tokens).toEqual([]);
+  });
 });
 
 describe("restoreMath (与 protectMath 一一对应)", () => {

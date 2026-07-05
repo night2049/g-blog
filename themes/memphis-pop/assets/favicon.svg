@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Memphis Pop g-blog">
+  <rect width="64" height="64" rx="10" fill="#fff7f0"/>
+  <path d="M8 50 28 14l28 36z" fill="#ffe45c" stroke="#17131f" stroke-width="4"/>
+  <circle cx="18" cy="18" r="8" fill="#ff3ea5" stroke="#17131f" stroke-width="4"/>
+  <rect x="36" y="12" width="16" height="16" fill="#00a7e1" stroke="#17131f" stroke-width="4" transform="rotate(12 44 20)"/>
+  <path d="M13 38c8-8 13 8 21 0s13 8 21 0" fill="none" stroke="#00d084" stroke-width="4" stroke-linecap="round"/>
+</svg>

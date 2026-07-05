@@ -29,10 +29,11 @@ export function createGitHubApi(
         const res = await fetchImpl(url, { headers });
         if (!res.ok)
           throw new Error("GitHub 列表请求失败 " + res.status + ": " + url);
-        const items: any[] = await res.json();
+        const items: unknown = await res.json();
+        if (!Array.isArray(items)) throw new Error("GitHub 列表响应不是数组: " + url);
         if (items.length === 0) break;
         for (const it of items) {
-          if (it.pull_request) continue;
+          if (it && typeof it === "object" && "pull_request" in it) continue;
           out.push(mapIssue(it));
         }
         if (items.length < 100) break;

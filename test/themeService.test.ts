@@ -46,6 +46,57 @@ describe("loadThemeManifest", () => {
     });
     expect(() => loadThemeManifest(fs, "themes/default")).toThrow();
   });
+  test("manifest 路径字段拒绝穿越/绝对路径/反斜杠", () => {
+    expect(() =>
+      loadThemeManifest(
+        memFileStore(themeFiles({ "themes/default/theme.json": JSON.stringify({
+          defaultSkin: "../x",
+          mains: {},
+          scripts: {},
+          nav: [],
+          widgets: {},
+        }) })),
+        "themes/default",
+      ),
+    ).toThrow();
+    expect(() =>
+      loadThemeManifest(
+        memFileStore(themeFiles({ "themes/default/theme.json": JSON.stringify({
+          defaultSkin: "indigo",
+          mains: { post: "../main-post.html" },
+          scripts: {},
+          nav: [],
+          widgets: {},
+        }) })),
+        "themes/default",
+      ),
+    ).toThrow();
+    expect(() =>
+      loadThemeManifest(
+        memFileStore(themeFiles({ "themes/default/theme.json": JSON.stringify({
+          defaultSkin: "indigo",
+          mains: {},
+          scripts: { home: ["C:/evil.js"] },
+          nav: [],
+          widgets: {},
+        }) })),
+        "themes/default",
+      ),
+    ).toThrow();
+    expect(() =>
+      loadThemeManifest(
+        memFileStore(themeFiles({ "themes/default/theme.json": JSON.stringify({
+          defaultSkin: "indigo",
+          mains: {},
+          scripts: {},
+          nav: [],
+          widgets: {},
+          assets: ["a\\b.css"],
+        }) })),
+        "themes/default",
+      ),
+    ).toThrow();
+  });
 });
 
 describe("resolveThemePaths", () => {
@@ -86,6 +137,14 @@ describe("resolveThemePaths", () => {
     const fs = memFileStore(themeFiles());
     const cfg = fixtureConfig();
     cfg.theme = { name: "default", skin: "ghost" };
+    expect(() => resolveThemePaths(cfg, fs)).toThrow();
+  });
+  test("配置中的 theme.name / skin 拒绝路径穿越", () => {
+    const fs = memFileStore(themeFiles());
+    const cfg = fixtureConfig();
+    cfg.theme = { name: "../default", skin: "indigo" };
+    expect(() => resolveThemePaths(cfg, fs)).toThrow();
+    cfg.theme = { name: "default", skin: "../indigo" };
     expect(() => resolveThemePaths(cfg, fs)).toThrow();
   });
 });
@@ -142,6 +201,7 @@ describe("deriveChromeVars", () => {
       { label: "目录", page: "dir" },
     ],
     widgets: {},
+    assets: [],
   };
   function cfgWith(over: (c: Config) => void): Config {
     const c = fixtureConfig();
@@ -283,10 +343,18 @@ describe("lang 注入 (方案B: 经 ChromeVars)", () => {
     expect(deriveChromeVars(c, manifest).lang).toBe(c.site.language);
     expect(deriveChromeVars(c, manifest).lang).toBe("zh-CN");
   });
+  test("deriveChromeVars 生成 giscus 主题 JS 字符串字面量", () => {
+    const c = fixtureConfig();
+    c.site.url = "https://blog.example.com/x</script>";
+    const v = deriveChromeVars(c, manifest);
+    expect(v.giscusThemeDark).toBe("https://blog.example.com/x</script>/giscus-dark.css");
+    expect(v.giscusThemeDarkJs).toContain("\\u003c/script>");
+    expect(v.giscusThemeDarkJs).not.toContain("</script>");
+  });
   test("toChromeData 不含 lang (不泄漏进 chrome.json)", () => {
     const c = fixtureConfig();
     const data = toChromeData(deriveChromeVars(c, manifest), c.site.title);
-    expect("lang" in (data as Record<string, unknown>)).toBe(false);
+    expect("lang" in (data as unknown as Record<string, unknown>)).toBe(false);
   });
 });
 

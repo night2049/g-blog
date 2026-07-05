@@ -59,6 +59,7 @@ export async function runIncrementalLocal(deps: IncrementalLocalDeps): Promise<v
     fs,
     md,
     cfg,
+    sourceKind: "local-markdown",
     templates,
     manifest,
     chrome,

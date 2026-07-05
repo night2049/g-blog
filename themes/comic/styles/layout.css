@@ -274,8 +274,11 @@
     border-radius: var(--comic-radius);
     background-color: var(--gb-surface-container-low);
     background-image: var(--comic-paper);
-    text-decoration: none;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .post-card-main {
+    display: block;
+    text-decoration: none;
   }
   .post-card-title {
     font-size: var(--gb-text-title);
@@ -467,7 +470,7 @@
   }
 }
 
-/* 列表卡片微旋转: 卡是 ul.post-list > li > a.post-card, 故按 li 序号交替正负 (置于 @layer 外, 优先级高于卡片基样式).
+/* 列表卡片微旋转: 卡是 ul.post-list > li > article.post-card, 故按 li 序号交替正负 (置于 @layer 外, 优先级高于卡片基样式).
    hover 时回正并浮起; reduce-motion 下取消旋转 (见文件末尾). */
 .post-list > li:nth-child(odd) .post-card {
   transform: rotate(-0.5deg);

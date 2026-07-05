@@ -73,6 +73,16 @@ describe("loadConfig 基础文件", () => {
       load({ "config/site.json": JSON.stringify({ url: "https://x.com" }) }),
     ).toThrow();
   });
+  test("基础字符串字段必须为字符串", () => {
+    expect(() =>
+      load({ "config/site.json": JSON.stringify({ title: 123, url: "https://x.com" }) }),
+    ).toThrow();
+    const badBuild = JSON.stringify({
+      build: { publishedLabel: 123, metaMarker: "meta", pageLabel: "page", dirPrefix: "dir" },
+      pagination: { home: 2, archive: 100, directory: 10, tag: 10 },
+    });
+    expect(() => load({ "config/build.json": badBuild })).toThrow();
+  });
   test("合法多文件合并", () => {
     const c = load();
     expect(c.build.publishedLabel).toBe("published");
@@ -93,6 +103,11 @@ describe("loadConfig 基础文件", () => {
       pagination: { home: 2, archive: 0, directory: 10, tag: 10 },
     });
     expect(() => load({ "config/build.json": bad })).toThrow();
+    const stringPage = JSON.stringify({
+      build: { publishedLabel: "p", metaMarker: "meta", pageLabel: "page", dirPrefix: "dir" },
+      pagination: { home: "2", archive: 100, directory: 10, tag: 10 },
+    });
+    expect(() => load({ "config/build.json": stringPage })).toThrow();
   });
   test("缺 build.pageLabel / dirPrefix 抛错", () => {
     const noPage = JSON.stringify({
@@ -104,6 +119,38 @@ describe("loadConfig 基础文件", () => {
   test("site.language 缺省兜底 zh-CN", () => {
     const noLang = JSON.stringify({ title: "T", url: "https://x.com" });
     expect(load({ "config/site.json": noLang }).site.language).toBe("zh-CN");
+  });
+  test("site.url 非空时必须为 http(s) URL", () => {
+    expect(load({ "config/site.json": JSON.stringify({ title: "T", url: "http://x.com" }) }).site.url).toBe(
+      "http://x.com",
+    );
+    expect(load({ "config/site.json": JSON.stringify({ title: "T", url: "https://x.com" }) }).site.url).toBe(
+      "https://x.com",
+    );
+    expect(() =>
+      load({
+        "config/site.json": JSON.stringify({ title: "T", url: "javascript:alert(1)" }),
+        "config/feed.json": JSON.stringify({ enabled: false }),
+      }),
+    ).toThrow();
+    expect(() =>
+      load({
+        "config/site.json": JSON.stringify({ title: "T", url: "not a url" }),
+        "config/feed.json": JSON.stringify({ enabled: false }),
+      }),
+    ).toThrow();
+  });
+  test("site.language 必须为安全 BCP47 形态", () => {
+    expect(
+      load({ "config/site.json": JSON.stringify({ title: "T", url: "https://x.com", language: "en-US" }) }).site
+        .language,
+    ).toBe("en-US");
+    expect(() =>
+      load({
+        "config/site.json": JSON.stringify({ title: "T", language: 'zh-CN" onclick="x' }),
+        "config/feed.json": JSON.stringify({ enabled: false }),
+      }),
+    ).toThrow();
   });
   test("excludedLabels 缺省兜底 [], 非数组抛错", () => {
     const noExcl = JSON.stringify({
@@ -168,6 +215,65 @@ describe("loadConfig feed (扩展, 缺省关闭)", () => {
 describe("loadConfig comments (扩展, 缺省关闭)", () => {
   test("comments.json 缺省 -> 关闭", () => {
     expect(load({ "config/comments.json": null }).comments.enabled).toBe(false);
+  });
+  test("enabled 必须为布尔", () => {
+    expect(() =>
+      load({ "config/comments.json": JSON.stringify({ enabled: "yes" }) }),
+    ).toThrow();
+  });
+  test("enabled 时 repo 与必填字段校验", () => {
+    expect(() =>
+      load({
+        "config/comments.json": JSON.stringify({
+          enabled: true,
+          repo: "bad repo",
+          repoId: "R",
+          category: "Announcements",
+          categoryId: "C",
+          mapping: "pathname",
+        }),
+      }),
+    ).toThrow();
+    expect(() =>
+      load({
+        "config/comments.json": JSON.stringify({
+          enabled: true,
+          repo: "owner/repo",
+          repoId: "",
+          category: "Announcements",
+          categoryId: "C",
+          mapping: "pathname",
+        }),
+      }),
+    ).toThrow();
+  });
+  test("mapping 必须为 giscus 白名单", () => {
+    for (const mapping of ["pathname", "url", "title", "og:title", "specific", "number"]) {
+      expect(
+        load({
+          "config/comments.json": JSON.stringify({
+            enabled: true,
+            repo: "owner/repo",
+            repoId: "R",
+            category: "Announcements",
+            categoryId: "C",
+            mapping,
+          }),
+        }).comments.mapping,
+      ).toBe(mapping);
+    }
+    expect(() =>
+      load({
+        "config/comments.json": JSON.stringify({
+          enabled: true,
+          repo: "owner/repo",
+          repoId: "R",
+          category: "Announcements",
+          categoryId: "C",
+          mapping: "javascript",
+        }),
+      }),
+    ).toThrow();
   });
 });
 

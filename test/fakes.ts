@@ -170,6 +170,8 @@ footerPolice: "",
 rssLinks: "",
 giscusThemeLight: "https://blog.example.com/giscus-light.css",
 giscusThemeDark: "https://blog.example.com/giscus-dark.css",
+giscusThemeLightJs: '"https://blog.example.com/giscus-light.css"',
+giscusThemeDarkJs: '"https://blog.example.com/giscus-dark.css"',
 lang: "zh-CN",
 ...over,
 };

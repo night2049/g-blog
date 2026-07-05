@@ -8,7 +8,7 @@ import type {
   FileStore,
   ThemeManifest,
 } from "./types.ts";
-import { escapeHtml } from "./template.ts";
+import { escapeHtmlAttr, escapeHtmlText, jsStringLiteral } from "./template.ts";
 
 export interface ThemePaths {
   themeDir: string;
@@ -29,6 +29,44 @@ const PAGE_HREF: Record<string, string> = {
   tag: "%ROOT%tag.html",
 };
 
+function assertSafePathFragment(value: unknown, label: string, allowSlash = false): string {
+  if (typeof value !== "string" || value === "")
+    throw new Error(label + " 必须为非空字符串");
+  if (value.includes("\0")) throw new Error(label + " 不得含 NUL 字符");
+  if (value.includes("\\")) throw new Error(label + " 不得含反斜杠");
+  if (value.startsWith("/") || /^[A-Za-z]:/.test(value))
+    throw new Error(label + " 不得为绝对路径");
+  const parts = value.split("/");
+  if (!allowSlash && parts.length > 1) throw new Error(label + " 不得含斜杠");
+  if (parts.some((p) => p === "" || p === "." || p === ".."))
+    throw new Error(label + " 不得穿越目录");
+  return value;
+}
+
+function validateManifestPaths(raw: any): void {
+  assertSafePathFragment(raw.defaultSkin, "theme.json: defaultSkin");
+  for (const [page, main] of Object.entries(raw.mains ?? {})) {
+    assertSafePathFragment(page, "theme.json: mains key");
+    assertSafePathFragment(main, "theme.json: mains." + page, true);
+  }
+  for (const [page, scripts] of Object.entries(raw.scripts ?? {})) {
+    assertSafePathFragment(page, "theme.json: scripts key");
+    if (!Array.isArray(scripts)) throw new Error("theme.json: scripts." + page + " 必须为数组");
+    for (const script of scripts)
+      assertSafePathFragment(script, "theme.json: scripts." + page + "[]", true);
+  }
+  for (const [page, widgets] of Object.entries(raw.widgets ?? {})) {
+    assertSafePathFragment(page, "theme.json: widgets key");
+    if (!Array.isArray(widgets)) throw new Error("theme.json: widgets." + page + " 必须为数组");
+    for (const widget of widgets)
+      assertSafePathFragment(widget, "theme.json: widgets." + page + "[]");
+  }
+  if (raw.assets !== undefined && !Array.isArray(raw.assets))
+    throw new Error("theme.json: assets 必须为数组");
+  for (const asset of raw.assets ?? [])
+    assertSafePathFragment(asset, "theme.json: assets[]", true);
+}
+
 // 读主题清单 theme.json; 缺文件或缺关键字段抛中文错误.
 export function loadThemeManifest(fs: FileStore, themeDir: string): ThemeManifest {
   const text = fs.read(themeDir + "/theme.json");
@@ -48,6 +86,7 @@ export function loadThemeManifest(fs: FileStore, themeDir: string): ThemeManifes
   if (!Array.isArray(raw.nav)) throw new Error("theme.json: nav 必须为数组");
   if (!raw.widgets || typeof raw.widgets !== "object")
     throw new Error("theme.json: widgets 缺失");
+  validateManifestPaths(raw);
   return {
     defaultSkin: raw.defaultSkin,
     mains: raw.mains,
@@ -67,10 +106,12 @@ export function resolveThemePaths(
   fs: FileStore,
   themesRoot: string = "themes",
 ): ThemePaths {
+  assertSafePathFragment(cfg.theme.name, "config/appearance.json: theme.name");
   const themeDir = themesRoot.replace(/\/+$/, "") + "/" + cfg.theme.name;
   // 读清单同时校验主题存在 (theme.json 缺失即主题不存在).
   const manifest = loadThemeManifest(fs, themeDir);
   const skin = cfg.theme.skin || manifest.defaultSkin;
+  assertSafePathFragment(skin, "config/appearance.json: theme.skin");
   if (!skin) throw new Error("主题 " + cfg.theme.name + " 未指定皮肤且无 defaultSkin");
 
   const contractPath = themeDir + "/styles/contract.css";
@@ -158,21 +199,21 @@ export function deriveChromeVars(cfg: Config, manifest: ThemeManifest): ChromeVa
   // logo: text -> 文本链接; image -> 图片链接 (均回首页, 含 %ROOT% 占位).
   const logo =
     ap.logo.type === "image"
-      ? `<a class="site-logo-link" href="%ROOT%index.html"><img class="site-logo-img" src="${encodeURI(
-          ap.logo.value,
-        )}" alt="${escapeHtml(cfg.site.title)}" /></a>`
-      : `<a class="site-logo-link" href="%ROOT%index.html">${escapeHtml(ap.logo.value)}</a>`;
+      ? `<a class="site-logo-link" href="%ROOT%index.html"><img class="site-logo-img" src="${escapeHtmlAttr(
+          encodeURI(ap.logo.value),
+        )}" alt="${escapeHtmlAttr(cfg.site.title)}" /></a>`
+      : `<a class="site-logo-link" href="%ROOT%index.html">${escapeHtmlText(ap.logo.value)}</a>`;
 
   // nav: 内置导航 + 外链.
   const builtin = manifest.nav
     .map(
-      (n) => `<a href="${navHref(n.page)}">${escapeHtml(n.label)}</a>`,
+      (n) => `<a href="${escapeHtmlAttr(navHref(n.page))}">${escapeHtmlText(n.label)}</a>`,
     )
     .join("");
   const external = ap.links
     .map(
       (l) =>
-        `<a class="nav-external" href="${encodeURI(l.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
+        `<a class="nav-external" href="${escapeHtmlAttr(encodeURI(l.href))}" target="_blank" rel="noopener noreferrer">${escapeHtmlText(
           l.label,
         )}</a>`,
     )
@@ -180,16 +221,17 @@ export function deriveChromeVars(cfg: Config, manifest: ThemeManifest): ChromeVa
   const nav = builtin + external;
 
   // 页脚: 版权 / ICP 备案 (工信部) / 公安备案 (含官方链接).
-  const footerCopyright = ap.footer.copyright ? escapeHtml(ap.footer.copyright) : "";
+  const footerCopyright = ap.footer.copyright ? escapeHtmlText(ap.footer.copyright) : "";
   const footerIcp = ap.footer.icp
-    ? `<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">${escapeHtml(
+    ? `<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">${escapeHtmlText(
         ap.footer.icp,
       )}</a>`
     : "";
+  const policeHref =
+    "https://beian.mps.gov.cn/#/query/webSearch?code=" +
+    encodeURIComponent(ap.footer.policeCode);
   const footerPolice = ap.footer.police
-    ? `<a class="footer-beian" href="https://beian.mps.gov.cn/#/query/webSearch?code=${encodeURIComponent(
-        ap.footer.policeCode,
-      )}" target="_blank" rel="noopener noreferrer">${escapeHtml(ap.footer.police)}</a>`
+    ? `<a class="footer-beian" href="${escapeHtmlAttr(policeHref)}" target="_blank" rel="noopener noreferrer">${escapeHtmlText(ap.footer.police)}</a>`
     : "";
 
   // rssLinks: 按 rss.formats 生成 (关闭/空则为空).
@@ -209,6 +251,8 @@ export function deriveChromeVars(cfg: Config, manifest: ThemeManifest): ChromeVa
     rssLinks,
     giscusThemeLight,
     giscusThemeDark,
+    giscusThemeLightJs: jsStringLiteral(giscusThemeLight),
+    giscusThemeDarkJs: jsStringLiteral(giscusThemeDark),
     lang: cfg.site.language, // <html lang> 源 (config.ts 已保证缺省 zh-CN); 经 render 的 ...chrome 注入, toChromeData 不带出故不入 chrome.json
   };
 }

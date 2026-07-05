@@ -122,6 +122,35 @@ describe("reassembleAll", () => {
     expect(fs.dump()["post/I_a.html"]).toBe("<p>无标记</p>"); // 未被改写
   });
 
+  test("rss.enabled=false -> 删除旧 feed 文件", () => {
+    const fs = seedSite();
+    fs.write("feed.xml", "<rss/>");
+    fs.write("atom.xml", "<feed/>");
+    fs.write("feed.json", "{}");
+    const cfg2 = fixtureConfig();
+    cfg2.rss.enabled = false;
+    reassembleAll({ fs, cfg: cfg2, templates: provider, manifest, chrome: fakeChrome(), assetsDir: "assets" });
+    const d = fs.dump();
+    expect("feed.xml" in d).toBe(false);
+    expect("atom.xml" in d).toBe(false);
+    expect("feed.json" in d).toBe(false);
+  });
+
+  test("切主题清理已知顶层主题资产并保留非 manifest 用户资源", () => {
+    const fs = seedSite();
+    fs.write("favicon.svg", "OLD");
+    fs.write("old-logo.png", "OLD");
+    fs.write("old-theme.js", "OLD");
+    fs.write("giscus-dark.css", "OLD");
+    const manifest2 = fakeThemeManifest({ assets: ["favicon.svg"] });
+    reassembleAll({ fs, cfg, templates: provider, manifest: manifest2, chrome: fakeChrome(), assetsDir: "assets" });
+    const d = fs.dump();
+    expect(d["favicon.svg"]).toBe("COPIED");
+    expect(d["old-logo.png"]).toBe("OLD");
+    expect(d["old-theme.js"]).toBe("OLD");
+    expect("giscus-dark.css" in d).toBe(false);
+  });
+
   test("站点缺文件 -> 告警跳过", () => {
     const fs = seedSite();
     fs.remove("post/I_a.html");

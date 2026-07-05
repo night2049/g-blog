@@ -70,13 +70,13 @@ https://raw.githubusercontent.com/night2049/g-blog/refs/heads/main/gblog-deploy-
 
 5. **写第一篇**：在内容仓新建一个 Issue，标题即文章标题，正文写 Markdown，打上 `published` 标签。Actions 自动构建并推送到站点仓，稍候 GitHub Pages 即上线。
 
-> 内容仓私有时，issue 里贴的图片在构建时下载需要一个 **classic PAT（勾选 `repo`）**——fine-grained token 与默认的 `GITHUB_TOKEN` 都拉不到私有附件图。在 Settings → Developer settings → Personal access tokens (classic) 生成后，加到内容仓 Settings → Secrets and variables → Actions，命名为 `CONTENT_PAT`（纯文字文章可先不配）。所有密钥只放在 Actions Secrets，切勿提交进仓库。
+> 内容仓私有时，issue 里贴的 GitHub 附件图片会先通过 GitHub Markdown API 解析为带签名的媒体 URL，再匿名下载；构建不会把 token 直接发给图片 CDN。默认使用当前 workflow 的 `GITHUB_TOKEN`；如果你的权限模型导致 Markdown API 无法读取私有内容，可额外在 Actions Secrets 中配置 `CONTENT_PAT` 作为 fallback。所有密钥只放在 Actions Secrets，切勿提交进仓库。
 
 ## 写作
 
 在私有仓库创建一个新的 GitHub Issue：标题即文章标题，正文写 Markdown。给 issue 打上 `published` 标签即发布，关闭 issue 或移除`published`标签即撤回文章。
 
-issue 上的其他标签会变成文章标签，其中 `dir:` 开头的标签（如 `dir:随笔`）会生成目录。正文里贴的图片会在构建时下载到站点（私有仓需配 `CONTENT_PAT`）。
+issue 上的其他标签会变成文章标签，其中 `dir:` 开头的标签（如 `dir:随笔`）会生成目录。正文里贴的图片会在构建时下载到站点；私有 GitHub 附件按上面的 Markdown API 签名 URL 流程处理。
 
 > 也支持本地 Markdown：把 `.md` 放进 `content/` 目录即可，适合习惯本地写作的场景，写法见[本地 Markdown 指南](docs/LOCAL_MARKDOWN_GUIDE.zh-CN.md)。
 

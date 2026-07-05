@@ -1,6 +1,6 @@
 ---
 name: gblog-deploy-verify
-description: 全程托管给 AI：用 gh CLI 从零初始化并部署一个 gblog 博客（从开源模板创建私有内容仓 + 建公开站点仓 + Deploy Key + CONTENT_PAT + 改配置/workflow + 写 issue 文章与本地 md 文章），再校验 Pages 上线，并可选配置 giscus 评论。上游开源仓库 night2049/g-blog。涉及 部署/初始化/上线/私有仓库/fork/deploy key/github pages/验证博客/issue 发文/双仓库/评论/giscus 时使用。
+description: 全程托管给 AI：用 gh CLI 从零初始化并部署一个 gblog 博客（从开源模板创建私有内容仓 + 建公开站点仓 + Deploy Key + 可选 CONTENT_PAT fallback + 改配置/workflow + 写 issue 文章与本地 md 文章），再校验 Pages 上线，并可选配置 giscus 评论。上游开源仓库 night2049/g-blog。涉及 部署/初始化/上线/私有仓库/fork/deploy key/github pages/验证博客/issue 发文/双仓库/评论/giscus 时使用。
 ---
 
 # gblog 部署与验证（AI 托管）
@@ -61,11 +61,11 @@ gh repo deploy-key add "$env:TEMP\gblog_deploy_key.pub" --repo <OWNER>/<SITE> --
 Get-Content $env:TEMP\gblog_deploy_key -Raw | gh secret set BLOG_DEPLOY_KEY --repo <OWNER>/<CONTENT>
 ```
 
-### 4. 配置 CONTENT_PAT（必需）
+### 4. 配置 CONTENT_PAT（可选 fallback）
 
-私有内容仓里 issue 贴的图片存放在 `private-user-images.githubusercontent.com`，构建时下载这类私有附件**必须**用 **classic PAT（`repo` scope）**——fine-grained PAT 和 Actions 的 `GITHUB_TOKEN` 都拉不到，缺它则文章里的图片无法渲染。**PAT 无法用命令行创建**（需网页端 sudo 验证），在浏览器创建后用 gh 配置为 Secret：
+私有内容仓里 issue 贴的 GitHub 附件图片会先通过 GitHub Markdown API 解析为带签名的 `private-user-images.githubusercontent.com` 媒体 URL，再匿名下载；构建不会把 token 直接发给图片 CDN。默认使用当前 workflow 的 `GITHUB_TOKEN`。如果你的权限模型导致 Markdown API 无法读取私有内容，可额外配置 **classic PAT（`repo` scope）** 到 `CONTENT_PAT` 作为 fallback。**PAT 无法用命令行创建**（需网页端 sudo 验证），在浏览器创建后用 gh 配置为 Secret：
 
-- 创建：打开 https://github.com/settings/tokens/new?scopes=repo，有效期选 No expiration（token 由 AI 直接写进仓库 Actions Secret，不落地、无需人工续期），生成并复制。
+- 创建：打开 https://github.com/settings/tokens/new?scopes=repo，仅在确有需要时创建，选择最短可接受有效期并定期轮换；生成后复制。
 - 配置：
 
 ```bash

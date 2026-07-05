@@ -233,6 +233,9 @@
     border: 1px solid var(--gb-outline-variant);
     border-radius: var(--gb-shape-lg);
     background: var(--gb-surface-container-low);
+  }
+  .post-card-main {
+    display: block;
     text-decoration: none;
   }
   .post-card-title {

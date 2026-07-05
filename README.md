@@ -70,13 +70,13 @@ This project is a GitHub **template repository**. Use it to create your own priv
 
 5. **Write your first post**: Create a new Issue in the content repo. The title becomes the post title, and the body is Markdown. Add the `published` label. Actions builds automatically and pushes to the site repo, and GitHub Pages goes live shortly after.
 
-> When the content repo is private, downloading images pasted into issues at build time requires a **classic PAT (with the `repo` scope)** — fine-grained tokens and the default `GITHUB_TOKEN` cannot fetch private attachment images. Generate one under Settings → Developer settings → Personal access tokens (classic), then add it to the content repo under Settings → Secrets and variables → Actions, named `CONTENT_PAT` (you can skip this for text-only posts). Keep all secrets in Actions Secrets only, and never commit them to the repository.
+> When the content repo is private, GitHub attachment images pasted into issues are first resolved through GitHub's Markdown API into signed media URLs, then downloaded anonymously; the build does not send a token directly to the image CDN. The workflow uses the current `GITHUB_TOKEN` by default. If your permission model prevents the Markdown API from reading private content, add `CONTENT_PAT` as an Actions Secret fallback. Keep all secrets in Actions Secrets only, and never commit them to the repository.
 
 ## Writing
 
 Create a new GitHub Issue in your private repo: the title becomes the post title, and the body is Markdown. Add the `published` label to publish; close the issue or remove the `published` label to unpublish.
 
-Other labels on the issue become post tags, and labels starting with `dir:` (e.g. `dir:essays`) generate directories. Images pasted into the body are downloaded to the site at build time (private repos require `CONTENT_PAT`).
+Other labels on the issue become post tags, and labels starting with `dir:` (e.g. `dir:essays`) generate directories. Images pasted into the body are downloaded to the site at build time; private GitHub attachments use the signed-URL Markdown API flow described above.
 
 > Local Markdown is also supported: just drop `.md` files into the `content/` directory. This suits those who prefer writing locally — see the [Local Markdown Guide](docs/LOCAL_MARKDOWN_GUIDE.md).
 

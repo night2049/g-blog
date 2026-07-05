@@ -142,12 +142,31 @@ export function pruneOrphanImages(fs: FileStore, existing: string[], used: Set<s
   for (const path of existing) if (!used.has(path)) fs.remove(path);
 }
 
-// reassemble 清主题资产: 删站点根顶层所有 .js/.css (旧主题脚本含 comic-*.js + app.css).
+const KNOWN_TOP_LEVEL_THEME_ASSETS = new Set([
+  "app.js",
+  "archive.js",
+  "browse.js",
+  "chrome.js",
+  "dir.js",
+  "tag.js",
+  "tags.js",
+  "widgets.js",
+  "comic-ink-icon.js",
+  "comic-tag-rough.js",
+  "giscus-light.css",
+  "giscus-dark.css",
+  "favicon.svg",
+]);
+
+// reassemble 清主题资产: 仅删当前主题清单与内置已知的顶层主题/runtime 资产.
 // 随后 copyThemeAssets 重拷当前主题资产; app.css 由 build 末尾 compileCss 重写 (run() 后无条件编译).
-// 仅顶层: 子目录 data/、post/<id>/、独立页 <id>/ 一律不动. 消除切主题后旧主题脚本残留 (无台账, 全清再全建).
-export function cleanThemeAssets(fs: FileStore): void {
+// 仅顶层: 子目录 data/、post/<id>/、独立页 <id>/ 一律不动, 也不按扩展名误删用户根级资源.
+export function cleanThemeAssets(fs: FileStore, manifest: ThemeManifest): void {
+  const keepSet = new Set(SITE_KEEP);
+  const assetSet = new Set([...KNOWN_TOP_LEVEL_THEME_ASSETS, ...themeScriptAssets(manifest)]);
   for (const path of fs.listAll("")) {
     if (path.includes("/")) continue; // 仅顶层 (子目录产物不动)
-    if (path.endsWith(".js") || path.endsWith(".css")) fs.remove(path);
+    if (keepSet.has(path)) continue;
+    if (assetSet.has(path)) fs.remove(path);
   }
 }

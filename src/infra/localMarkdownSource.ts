@@ -9,6 +9,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { parseDateStrict } from "../domain/meta.ts";
 import type { Config, LocalPost, RawIssue } from "../domain/types.ts";
 
 // content 下硬编码子目录 -> 领域 kind (本轮不做可配).
@@ -88,10 +89,7 @@ function normalizeDate(raw: unknown): string | null {
   if (raw === undefined || raw === null) return null;
   const s = String(raw).trim();
   if (!s) return null;
-  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(s);
-  const t = Date.parse(dateOnly ? s + "T00:00:00.000Z" : s);
-  if (Number.isNaN(t)) return null;
-  return new Date(t).toISOString();
+  return parseDateStrict(s);
 }
 
 // 取字符串数组: 数组取其中非空字符串项; 单字符串包成单元素数组; 其它 -> [].

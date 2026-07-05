@@ -1,6 +1,14 @@
 import { test, expect, describe } from "bun:test";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { decideStrategy, run } from "../src/app/run.ts";
 import type { StrategyEnv } from "../src/app/run.ts";
+import {
+  computeChangedPaths,
+  parseChangedPathsNameStatus,
+  readEventPayload,
+} from "../scripts/build.ts";
 import { extractContentHtml } from "../src/domain/contentMarkers.ts";
 import {
   memFileStore,
@@ -16,8 +24,10 @@ import {
 
 const env = (over: Partial<StrategyEnv>): StrategyEnv => ({
   hasIssuePayload: false,
+  eventPayloadOk: true,
   hasManifest: true,
   changedPaths: [],
+  changedPathsOk: true,
   forceFull: false,
   ...over,
 });
@@ -42,6 +52,14 @@ describe("decideStrategy", () => {
     expect(
       decideStrategy(env({ changedPaths: ["themes/default/styles/skins/indigo.css", "config/appearance.json"] })),
     ).toBe("reassemble");
+  });
+  test("关键配置变更 -> full", () => {
+    for (const path of ["config/build.json", "config/site.json", "config/feed.json", "config/content.json"]) {
+      expect(decideStrategy(env({ changedPaths: [path] }))).toBe("full");
+    }
+  });
+  test("未知 config 变更 -> full", () => {
+    expect(decideStrategy(env({ changedPaths: ["config/unknown.json"] }))).toBe("full");
   });
   test("src 与 themes 混合 -> full (src 优先)", () => {
     expect(decideStrategy(env({ changedPaths: ["themes/default/x.css", "src/a.ts"] }))).toBe("full");
@@ -69,13 +87,106 @@ describe("decideStrategy", () => {
       decideStrategy(env({ hasIssuePayload: true, changedPaths: ["content/posts/a.md"] })),
     ).toBe("incremental");
   });
-  test("content 下非 md (仅图片) + 无其它 -> 兜底 reassemble", () => {
-    expect(decideStrategy(env({ changedPaths: ["content/posts/img/a.png"] }))).toBe("reassemble");
+  test("content 下非 md (仅图片) -> full", () => {
+    expect(decideStrategy(env({ changedPaths: ["content/posts/img/a.png"] }))).toBe("full");
   });
   test("自定义 contentDir 识别本地 md", () => {
     expect(
       decideStrategy(env({ contentDir: "site-content", changedPaths: ["site-content/posts/a.md"] })),
     ).toBe("incrementalLocal");
+  });
+  test("自定义 contentDir 下非 md -> full", () => {
+    expect(
+      decideStrategy(env({ contentDir: "site-content", changedPaths: ["site-content/posts/img/a.png"] })),
+    ).toBe("full");
+  });
+  test("diff 失败且无 issue payload -> full", () => {
+    expect(decideStrategy(env({ changedPathsOk: false, changedPathsError: "bad rev" }))).toBe("full");
+  });
+  test("事件 payload 解析失败且无 issue payload -> full", () => {
+    expect(decideStrategy(env({ eventPayloadOk: false }))).toBe("full");
+  });
+  test("有 issue 载荷优先 incremental (即便 diff 失败)", () => {
+    expect(
+      decideStrategy(env({ hasIssuePayload: true, eventPayloadOk: false, changedPathsOk: false, changedPathsError: "bad rev" })),
+    ).toBe("incremental");
+  });
+});
+
+describe("computeChangedPaths", () => {
+  test("name-status: 普通状态、rename 拆 D+A、copy 记 A", () => {
+    expect(
+      parseChangedPathsNameStatus(
+        [
+          "M\tsrc/app/run.ts",
+          "A\tcontent/posts/a.md",
+          "D\tcontent/posts/old.md",
+          "R100\tcontent/posts/from.md\tcontent/posts/to.md",
+          "C100\tcontent/posts/src.md\tcontent/posts/copy.md",
+        ].join("\n"),
+      ),
+    ).toEqual([
+      { status: "M", path: "src/app/run.ts" },
+      { status: "A", path: "content/posts/a.md" },
+      { status: "D", path: "content/posts/old.md" },
+      { status: "D", path: "content/posts/from.md" },
+      { status: "A", path: "content/posts/to.md" },
+      { status: "A", path: "content/posts/copy.md" },
+    ]);
+  });
+
+  test("diff 失败返回结构化错误", () => {
+    const res = computeChangedPaths(
+      { DIFF_BASE: "abc", DIFF_HEAD: "def" },
+      () => ({ exitCode: 128, stdout: "", stderr: "bad revision" }),
+    );
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toContain("bad revision");
+  });
+
+  test("all-zero before 使用 diff-tree --root", () => {
+    const calls: string[][] = [];
+    const res = computeChangedPaths(
+      { DIFF_BASE: "0000000000000000000000000000000000000000", DIFF_HEAD: "abc" },
+      (cmd) => {
+        calls.push(cmd);
+        return { exitCode: 0, stdout: "A\tcontent/posts/a.md\n" };
+      },
+    );
+    expect(calls[0]).toEqual(["git", "diff-tree", "--root", "--name-status", "abc"]);
+    expect(res).toEqual({ ok: true, files: [{ status: "A", path: "content/posts/a.md" }] });
+  });
+});
+
+describe("readEventPayload", () => {
+  function writeEvent(text: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "gblog-event-"));
+    const file = join(dir, "event.json");
+    writeFileSync(file, text, "utf8");
+    return file;
+  }
+
+  test("解析 issue payload 与非 issue payload", () => {
+    const issueFile = writeEvent(JSON.stringify({ issue: { number: 1 } }));
+    const pushFile = writeEvent(JSON.stringify({ ref: "refs/heads/main" }));
+    try {
+      expect(readEventPayload(issueFile)).toEqual({ ok: true, hasIssuePayload: true });
+      expect(readEventPayload(pushFile)).toEqual({ ok: true, hasIssuePayload: false });
+    } finally {
+      rmSync(dirname(issueFile), { recursive: true, force: true });
+      rmSync(dirname(pushFile), { recursive: true, force: true });
+    }
+  });
+
+  test("事件 JSON 解析失败返回结构化错误", () => {
+    const file = writeEvent("{");
+    try {
+      const res = readEventPayload(file);
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.reason).toContain("事件 payload 解析失败");
+    } finally {
+      rmSync(dirname(file), { recursive: true, force: true });
+    }
   });
 });
 

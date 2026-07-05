@@ -43,9 +43,35 @@ describe("resolveDate", () => {
       resolveDate({ date: "2026-06-01T08:00:00Z" }, "2026-05-01T00:00:00Z"),
     ).toBe("2026-06-01T08:00:00.000Z");
   });
+  test("带时区 ISO datetime 按输入日期严格校验", () => {
+    expect(
+      resolveDate({ date: "2026-06-01T08:00:00+08:00" }, "2026-05-01T00:00:00Z"),
+    ).toBe("2026-06-01T00:00:00.000Z");
+  });
   test("非法 date 回退 createdAt", () => {
     expect(resolveDate({ date: "not-a-date" }, "2026-05-01T00:00:00Z")).toBe(
       "2026-05-01T00:00:00.000Z",
+    );
+  });
+  test("非法 date-only 不被 JS 自动滚动, 回退 createdAt", () => {
+    expect(resolveDate({ date: "2026-02-31" }, "2026-05-01T00:00:00Z")).toBe(
+      "2026-05-01T00:00:00.000Z",
+    );
+    expect(resolveDate({ date: "2025-02-29" }, "2026-05-01T00:00:00Z")).toBe(
+      "2026-05-01T00:00:00.000Z",
+    );
+  });
+  test("非法 ISO datetime 不被 JS 自动滚动, 回退 createdAt", () => {
+    expect(
+      resolveDate({ date: "2026-02-31T00:00:00.000Z" }, "2026-05-01T00:00:00Z"),
+    ).toBe("2026-05-01T00:00:00.000Z");
+    expect(
+      resolveDate({ date: "2025-02-29T08:00:00+08:00" }, "2026-05-01T00:00:00Z"),
+    ).toBe("2026-05-01T00:00:00.000Z");
+  });
+  test("合法闰日 date-only 通过", () => {
+    expect(resolveDate({ date: "2024-02-29" }, "2026-05-01T00:00:00Z")).toBe(
+      "2024-02-29T00:00:00.000Z",
     );
   });
   test("无 date 回退 createdAt", () => {

@@ -1,5 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import { resolve } from "node:path";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { resolvePreviewPath } from "../scripts/serve.ts";
 
 // resolvePreviewPath 返回站点根内的绝对路径 (用 node:path.resolve 归一化), 越界返回 null。
@@ -64,5 +66,28 @@ describe("resolvePreviewPath", () => {
   test("root 内合法的 .. 折叠仍在界内", () => {
     // "/a/../b" 折叠为 root/b, 未逃逸, 应返回 root/b。
     expect(resolvePreviewPath(ROOT, "/a/../b")).toBe(resolve(ROOT, "b"));
+  });
+
+  test("拒绝 realpath 越界的 symlink/junction 路径", () => {
+    const base = mkdtempSync(join(tmpdir(), "gblog-serve-"));
+    const outside = mkdtempSync(join(tmpdir(), "gblog-serve-out-"));
+    try {
+      mkdirSync(join(outside, "dir"));
+      writeFileSync(join(outside, "dir", "secret.txt"), "secret", "utf8");
+      let linked = false;
+      try {
+        symlinkSync(join(outside, "dir"), join(base, "link"), "junction");
+        linked = true;
+      } catch {
+        // Windows 权限或文件系统不支持时跳过 realpath 分支, 保留其它路径测试.
+      }
+      if (linked) {
+        expect(resolvePreviewPath(base, "/link/secret.txt")).toBeNull();
+        expect(resolvePreviewPath(base, "/link/new.txt")).toBeNull();
+      }
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 });

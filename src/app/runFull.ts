@@ -17,6 +17,7 @@ import type {
   RawIssue,
   TemplateProvider,
   ThemeManifest,
+  ImageSource,
 } from "../domain/types.ts";
 import { toSiteConfig, postDirDepth, rootPrefixFor } from "../domain/config.ts";
 import { listPublishedIssues } from "../domain/issueService.ts";
@@ -78,11 +79,10 @@ export async function runFull(deps: FullDeps): Promise<void> {
     localPosts,
     localImageReader,
   } = deps;
+  if ((api && !repo) || (!api && repo))
+    throw new Error("full 策略 api/repo 必须同时提供");
   // api/repo 缺省时 (离线本地预览) issues 视为空, 仅由 localPosts 建站.
-  const issues =
-    api && repo
-      ? await listPublishedIssues(api, repo, cfg.build.publishedLabel)
-      : [];
+  const issues = api && repo ? await listPublishedIssues(api, repo, cfg.build.publishedLabel) : [];
   console.log(
     "[全量] 拉取已发布 " + issues.length + " 项, 本地 md " + (localPosts?.length ?? 0) + " 篇",
   );
@@ -102,6 +102,7 @@ export async function runFull(deps: FullDeps): Promise<void> {
   const processOne = async (
     issue: RawIssue,
     localImages?: ImageDownloader,
+    imageSource?: ImageSource,
   ): Promise<void> => {
     if (isPageIssue(issue, cfg.build.pageLabel)) {
       const page = issueToPage(issue, cfg, md);
@@ -120,6 +121,8 @@ export async function runFull(deps: FullDeps): Promise<void> {
         fs,
         imgDir: page.nodeId,
         relPrefix: page.nodeId + "/",
+        imageSource,
+        webp: cfg.content.webp,
       });
       for (const a of assets) usedImages.add(a);
       fs.write(
@@ -145,6 +148,8 @@ export async function runFull(deps: FullDeps): Promise<void> {
       fs,
       imgDir: postImgDir(post.nodeId, postDir),
       relPrefix: post.nodeId + "/",
+      imageSource,
+      webp: cfg.content.webp,
     });
     for (const a of base.assets) usedImages.add(a);
     // 富化层 (文章专属): 锚点 + 派生卡片元数据 (摘要/首图/阅读时长/字数).
@@ -174,11 +179,14 @@ export async function runFull(deps: FullDeps): Promise<void> {
     });
   };
 
-  for (const issue of issues) await processOne(issue);
+  if (repo) {
+    for (const issue of issues)
+      await processOne(issue, undefined, { kind: "github-issue", repo, issueNumber: issue.number });
+  }
   // 本地 md: 文章与独立页均传本地图 reader (按其 md 文件目录解析相对图).
   for (const lp of localPosts ?? []) {
     const localImages = localImageReader ? localImageReader(lp.fileDir) : undefined;
-    await processOne(lp.issue, localImages);
+    await processOne(lp.issue, localImages, { kind: "local-markdown" });
   }
 
   rebuildAllShards(fs, manifestData);

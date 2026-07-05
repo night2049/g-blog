@@ -1,0 +1,91 @@
+/* Memphis Pop skin: bright paper, black ink, neon geometric accents. */
+
+:root {
+  --gb-font-body: "Trebuchet MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --gb-font-display: Impact, Haettenschweiler, "Arial Narrow Bold", "Trebuchet MS", sans-serif;
+  --gb-font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+
+  --gb-primary: #ff3ea5;
+  --gb-on-primary: #ffffff;
+  --gb-primary-container: #ffe45c;
+  --gb-on-primary-container: #17131f;
+  --gb-secondary: #00a7e1;
+  --gb-on-secondary: #ffffff;
+  --gb-error: #ff4b3e;
+  --gb-on-error: #ffffff;
+  --gb-outline: #17131f;
+  --gb-outline-variant: #17131f;
+
+  --gb-surface: #fff7f0;
+  --gb-surface-dim: #f3eee7;
+  --gb-surface-bright: #ffffff;
+  --gb-surface-container-lowest: #ffffff;
+  --gb-surface-container-low: #ffffff;
+  --gb-surface-container: #f8fbff;
+  --gb-surface-container-high: #ffe45c;
+  --gb-surface-container-highest: #00d084;
+  --gb-on-surface: #17131f;
+  --gb-on-surface-variant: #494052;
+
+  --gb-shadow-1: 5px 5px 0 #17131f;
+  --gb-shadow-2: 9px 9px 0 #17131f;
+  --gb-shadow-paper: 10px 10px 0 #17131f;
+  --gb-state-hover: color-mix(in srgb, var(--gb-primary) 18%, transparent);
+  --gb-state-focus: color-mix(in srgb, var(--gb-secondary) 22%, transparent);
+  --gb-state-pressed: color-mix(in srgb, var(--gb-primary) 28%, transparent);
+  --gb-focus-ring: #00a7e1;
+  --gb-zoom-overlay: rgba(23, 19, 31, 0.78);
+
+  --gb-hl-bg: #17131f;
+  --gb-hl-fg: #fff7f0;
+  --gb-hl-comment: #a99fba;
+  --gb-hl-keyword: #ff3ea5;
+  --gb-hl-func: #ffe45c;
+  --gb-hl-string: #00d084;
+  --gb-hl-number: #00a7e1;
+  --gb-hl-variable: #ff7a00;
+  --gb-hl-section: #9b5cff;
+}
+
+.dark {
+  --gb-primary: #ff5bb7;
+  --gb-on-primary: #17131f;
+  --gb-primary-container: #33213f;
+  --gb-on-primary-container: #ffe45c;
+  --gb-secondary: #39c9ff;
+  --gb-on-secondary: #17131f;
+  --gb-error: #ff8178;
+  --gb-on-error: #17131f;
+  --gb-outline: #fff7f0;
+  --gb-outline-variant: #fff7f0;
+
+  --gb-surface: #17131f;
+  --gb-surface-dim: #0f0b16;
+  --gb-surface-bright: #2a2035;
+  --gb-surface-container-lowest: #0f0b16;
+  --gb-surface-container-low: #21182c;
+  --gb-surface-container: #2a2035;
+  --gb-surface-container-high: #402c54;
+  --gb-surface-container-highest: #59386c;
+  --gb-on-surface: #fff7f0;
+  --gb-on-surface-variant: #e4d8f1;
+
+  --gb-shadow-1: 5px 5px 0 #fff7f0;
+  --gb-shadow-2: 9px 9px 0 #fff7f0;
+  --gb-shadow-paper: 10px 10px 0 #fff7f0;
+  --gb-state-hover: color-mix(in srgb, var(--gb-primary) 22%, transparent);
+  --gb-state-focus: color-mix(in srgb, var(--gb-secondary) 26%, transparent);
+  --gb-state-pressed: color-mix(in srgb, var(--gb-primary) 32%, transparent);
+  --gb-focus-ring: #ffe45c;
+  --gb-zoom-overlay: rgba(0, 0, 0, 0.9);
+
+  --gb-hl-bg: #0f0b16;
+  --gb-hl-fg: #fff7f0;
+  --gb-hl-comment: #b9aac9;
+  --gb-hl-keyword: #ff5bb7;
+  --gb-hl-func: #ffe45c;
+  --gb-hl-string: #00d084;
+  --gb-hl-number: #39c9ff;
+  --gb-hl-variable: #ffad33;
+  --gb-hl-section: #c49cff;
+}

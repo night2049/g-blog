@@ -1,0 +1,93 @@
+:root {
+  --gb-shape-xs: 0;
+  --gb-shape-sm: 0;
+  --gb-shape-md: 0;
+  --gb-shape-lg: 0;
+  --gb-shape-xl: 0;
+  --gb-shape-full: 9999px;
+  --gb-density: 1;
+  --gb-measure: 54rem;
+
+  --gb-font-body: "Avenir Next", Avenir, Montserrat, "Segoe UI", Roboto,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --gb-font-display: Futura, "Avenir Next", Avenir, "Segoe UI", Roboto,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --gb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --gb-primary: #e31b23;
+  --gb-on-primary: #ffffff;
+  --gb-primary-container: #ffe4df;
+  --gb-on-primary-container: #3f0707;
+  --gb-secondary: #0057b8;
+  --gb-on-secondary: #ffffff;
+  --gb-error: #b42318;
+  --gb-on-error: #ffffff;
+  --gb-outline: #111111;
+  --gb-outline-variant: #111111;
+
+  --gb-surface: #fffdf4;
+  --gb-surface-dim: #f1ead8;
+  --gb-surface-bright: #ffffff;
+  --gb-surface-container-lowest: #ffffff;
+  --gb-surface-container-low: #fff8df;
+  --gb-surface-container: #f3ead1;
+  --gb-surface-container-high: #f8d849;
+  --gb-surface-container-highest: #111111;
+  --gb-on-surface: #111111;
+  --gb-on-surface-variant: #45423a;
+
+  --gb-shadow-1: 6px 6px 0 #111111;
+  --gb-shadow-2: 10px 10px 0 #111111;
+  --gb-shadow-paper: 12px 12px 0 #111111;
+  --gb-zoom-overlay: rgba(17, 17, 17, 0.72);
+
+  --gb-hl-bg: #fff3bc;
+  --gb-hl-fg: #111111;
+  --gb-hl-comment: #666052;
+  --gb-hl-keyword: #e31b23;
+  --gb-hl-func: #0057b8;
+  --gb-hl-string: #157f3b;
+  --gb-hl-number: #111111;
+  --gb-hl-variable: #c28b00;
+  --gb-hl-section: #e31b23;
+}
+
+.dark {
+  --gb-primary: #ff4b38;
+  --gb-on-primary: #160000;
+  --gb-primary-container: #4a0808;
+  --gb-on-primary-container: #ffd7cf;
+  --gb-secondary: #5db2ff;
+  --gb-on-secondary: #001629;
+  --gb-error: #ff8a7a;
+  --gb-on-error: #160000;
+  --gb-outline: #f3ead1;
+  --gb-outline-variant: #f3ead1;
+
+  --gb-surface: #111111;
+  --gb-surface-dim: #080808;
+  --gb-surface-bright: #232323;
+  --gb-surface-container-lowest: #000000;
+  --gb-surface-container-low: #191919;
+  --gb-surface-container: #24211a;
+  --gb-surface-container-high: #f8d849;
+  --gb-surface-container-highest: #f3ead1;
+  --gb-on-surface: #fff8df;
+  --gb-on-surface-variant: #d9cfb5;
+
+  --gb-shadow-1: 6px 6px 0 #f3ead1;
+  --gb-shadow-2: 10px 10px 0 #f3ead1;
+  --gb-shadow-paper: 12px 12px 0 #f3ead1;
+  --gb-zoom-overlay: rgba(0, 0, 0, 0.88);
+
+  --gb-hl-bg: #1f1b12;
+  --gb-hl-fg: #fff8df;
+  --gb-hl-comment: #b8ad90;
+  --gb-hl-keyword: #ff4b38;
+  --gb-hl-func: #5db2ff;
+  --gb-hl-string: #9deb79;
+  --gb-hl-number: #f8d849;
+  --gb-hl-variable: #ffd166;
+  --gb-hl-section: #ff4b38;
+}

@@ -7,11 +7,14 @@ import {
   renderListPage,
   renderTags,
   escapeHtml,
+  escapeHtmlAttr,
+  jsStringLiteral,
   renderComments,
   buildCanonical,
   buildArticleJsonLd,
   buildPageJsonLd,
 } from "../src/domain/template.ts";
+import { Window } from "happy-dom";
 import { extractContentHtml } from "../src/domain/contentMarkers.ts";
 import { fakeThemeProvider, fakeThemeManifest, fakeChrome, fixtureConfig } from "./fakes.ts";
 import type { Config, PageDoc, Post, SiteConfig } from "../src/domain/types.ts";
@@ -39,6 +42,12 @@ describe("escapeHtml", () => {
   test("转义特殊字符", () => {
     expect(escapeHtml('<a>&"')).toBe("&lt;a&gt;&amp;&quot;");
   });
+  test("属性转义额外处理单引号", () => {
+    expect(escapeHtmlAttr(`a"'<&>`)).toBe("a&quot;&#39;&lt;&amp;&gt;");
+  });
+  test("JS 字符串字面量使用 JSON.stringify 且转义 <", () => {
+    expect(jsStringLiteral(`x</script>`)).toBe(`"x\\u003c/script>"`);
+  });
 });
 
 describe("assemblePage", () => {
@@ -61,6 +70,14 @@ describe("assemblePage", () => {
   test("baseof 注入 <html lang> (取 chrome.lang)", () => {
     const html = assemblePage(provider, manifest, "post", baseVars);
     expect(html).toContain('<html lang="zh-CN"');
+  });
+  test("baseof 注入 lang 时走属性转义", () => {
+    const html = assemblePage(provider, manifest, "post", {
+      ...baseVars,
+      lang: 'zh-CN" data-x="1',
+    });
+    expect(html).toContain('lang="zh-CN&quot; data-x=&quot;1"');
+    expect(html).not.toContain('data-x="1"');
   });
   test("home 选 main-list 并注入 browse.js+app.js", () => {
     const html = assemblePage(provider, manifest, "home", baseVars);
@@ -271,6 +288,44 @@ describe("renderComments", () => {
   });
   test("disabled 返回空串", () => {
     expect(renderComments({ ...base, enabled: false })).toBe("");
+  });
+  test("data-* 属性统一属性转义, DOM 解析后还原原始值", () => {
+    const h = renderComments(
+      {
+        ...base,
+        repoId: 'R"&<x>',
+        category: `A'&<B>`,
+        categoryId: 'C"x',
+      },
+      'https://blog.example.com/giscus-light.css?x="&y=<',
+    );
+    expect(h).not.toContain('data-evil="1"');
+    expect(h).toContain("&quot;");
+    expect(h).toContain("&#39;");
+    const window = new Window();
+    window.document.body.innerHTML = h;
+    const el = window.document.getElementById("giscus-mount")!;
+    expect(el.getAttribute("data-repo-id")).toBe('R"&<x>');
+    expect(el.getAttribute("data-category")).toBe(`A'&<B>`);
+    expect(el.getAttribute("data-theme")).toBe('https://blog.example.com/giscus-light.css?x="&y=<');
+  });
+  test("内联 JS 字符串占位不输出裸 </script>", () => {
+    const provider = fakeThemeProvider({
+      "partials/head.html":
+        "<title>{{pageTitle}}</title><script>var dark={{giscusThemeDarkJs}},light={{giscusThemeLightJs}};</script>",
+    });
+    const html = assemblePage(provider, fakeThemeManifest({ scripts: {}, widgets: {} }), "post", {
+      ...fakeChrome({
+        giscusThemeDark: `x</script><script>alert(1)</script>`,
+        giscusThemeLight: "light",
+      }),
+      pageTitle: "T",
+      title: "T",
+      content: "<p>x</p>",
+    });
+    expect(html).toContain("\\u003c/script>");
+    expect(html).not.toContain("x</script>");
+    expect(html).not.toContain("<script>alert(1)");
   });
 });
 

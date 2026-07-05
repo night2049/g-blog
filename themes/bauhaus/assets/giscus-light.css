@@ -1,0 +1,53 @@
+/* giscus 自定义主题 (浅色): 对齐站点 — 纯白表层, 中性灰, 纯黑强调, hairline 描边, 12px 圆角.
+   覆盖 GitHub Primer 的颜色变量(giscus 内部消费). 注意: 注释里不要出现星号加斜杠, 否则会提前结束本注释. */
+:root {
+  --color-canvas-default: #ffffff;
+  --color-canvas-subtle: #fafafa;
+  --color-canvas-overlay: #ffffff;
+  --color-canvas-inset: #fafafa;
+  --color-fg-default: #18181b;
+  --color-fg-muted: #71717a;
+  --color-fg-subtle: #a1a1aa;
+  --color-border-default: #e8e8ea;
+  --color-border-muted: #f0f0f1;
+  --color-neutral-muted: #f4f4f5;
+  --color-accent-fg: #000000;
+  --color-accent-emphasis: #000000;
+  --color-accent-muted: #d4d4d8;
+  --color-accent-subtle: #f4f4f5;
+  --color-btn-text: #18181b;
+  --color-btn-bg: #ffffff;
+  --color-btn-border: #e8e8ea;
+  --color-btn-hover-bg: #f4f4f5;
+  --color-btn-hover-border: #d4d4d8;
+  --color-btn-active-bg: #ededed;
+  --color-btn-primary-text: #ffffff;
+  --color-btn-primary-bg: #000000;
+  --color-btn-primary-border: transparent;
+  --color-btn-primary-hover-bg: #262626;
+  --color-btn-primary-disabled-text: #ffffffcc;
+  --color-btn-primary-disabled-bg: #d4d4d8;
+  --color-btn-primary-disabled-border: transparent;
+  --color-success-fg: #059669;
+  --color-danger-fg: #dc2626;
+  --color-prettylights-syntax-comment: #6a737d;
+  --color-prettylights-syntax-keyword: #d73a49;
+  --color-prettylights-syntax-string: #032f62;
+  --color-prettylights-syntax-entity: #6f42c1;
+  --color-prettylights-syntax-constant: #005cc5;
+  --color-prettylights-syntax-variable: #e36209;
+  font-family: "Inter Variable", "Noto Sans SC Variable", -apple-system,
+    BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+/* 圆角对齐站点 (输入框/按钮/评论卡/反应按钮统一 12px) */
+.gsc-comment-box,
+.gsc-comment-box-textarea,
+.gsc-comment-content,
+.btn,
+.gsc-reactions-count,
+.gsc-reaction-button,
+.gsc-reaction,
+.gsc-direct-reaction-button,
+.gsc-social-reaction-summary-item {
+  border-radius: 12px !important;
+}

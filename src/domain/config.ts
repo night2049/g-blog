@@ -13,6 +13,16 @@ import type {
 } from "./types.ts";
 
 const FEED_FORMATS: ReadonlySet<string> = new Set(["rss", "atom", "json"]);
+const COMMENT_MAPPINGS: ReadonlySet<string> = new Set([
+  "pathname",
+  "url",
+  "title",
+  "og:title",
+  "specific",
+  "number",
+]);
+const SITE_LANGUAGE_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+const GISCUS_REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 // 分享渠道白名单 (content.json share.networks 校验; "x" 在 widgets.js 映射为 twitter).
 const SHARE_NETWORKS: ReadonlySet<string> = new Set([
@@ -28,9 +38,66 @@ const SHARE_NETWORKS: ReadonlySet<string> = new Set([
   "email",
 ]);
 
+type JsonRecord = Record<string, unknown>;
+
 // 正整数校验.
 function isPositiveInt(v: unknown): boolean {
   return typeof v === "number" && Number.isInteger(v) && v > 0;
+}
+
+function assertRecord(v: unknown, label: string): JsonRecord {
+  if (!v || typeof v !== "object" || Array.isArray(v))
+    throw new Error(label + " 必须为对象");
+  return v as JsonRecord;
+}
+
+function optionalRecord(v: unknown, label: string): JsonRecord | undefined {
+  if (v === undefined || v === null) return undefined;
+  return assertRecord(v, label);
+}
+
+function assertString(v: unknown, label: string): string {
+  if (typeof v !== "string") throw new Error(label + " 必须为字符串");
+  return v;
+}
+
+function assertNonEmptyString(v: unknown, label: string): string {
+  const s = assertString(v, label);
+  if (!s) throw new Error(label + " 缺失");
+  return s;
+}
+
+function stringOr(v: unknown, def: string, label: string): string {
+  if (v === undefined || v === null) return def;
+  return assertString(v, label);
+}
+
+function validateSiteUrl(url: string): void {
+  if (!url) return;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("config/site.json: site.url 必须为合法 http(s) URL");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+    throw new Error("config/site.json: site.url 必须为 http(s) URL");
+}
+
+function validateLanguage(language: string): void {
+  if (!SITE_LANGUAGE_RE.test(language))
+    throw new Error("config/site.json: site.language 必须为合法 BCP47 语言标签");
+}
+
+function validateGiscusComments(c: Config["comments"]): void {
+  if (!COMMENT_MAPPINGS.has(c.mapping))
+    throw new Error("config/comments.json: mapping 必须为 giscus 白名单值");
+  if (!c.enabled) return;
+  if (!GISCUS_REPO_RE.test(c.repo))
+    throw new Error("config/comments.json: repo 必须形如 owner/repo");
+  for (const key of ["repoId", "category", "categoryId"] as const) {
+    if (!c[key]) throw new Error("config/comments.json: " + key + " 启用时必填");
+  }
 }
 
 /**
@@ -82,7 +149,7 @@ export function rootPrefixFor(depth: number): string {
 }
 
 // 读单个配置文件; 不存在返回 null, 解析失败抛中文错误.
-function readJson(fs: FileStore, path: string): any | null {
+function readJson(fs: FileStore, path: string): unknown | null {
   const text = fs.read(path);
   if (text === null) return null;
   try {
@@ -103,53 +170,70 @@ export function loadConfig(fs: FileStore, dir: string = "config"): Config {
   const p = (name: string) => dir.replace(/\/+$/, "") + "/" + name;
 
   // ---- 基础: site.json (必需) ----
-  const site = readJson(fs, p("site.json"));
-  if (!site) throw new Error("找不到基础配置文件: " + p("site.json"));
-  if (!site.title) throw new Error("config/site.json: site.title 缺失");
-  site.description = site.description ?? "";
-  site.author = site.author ?? "";
-  site.url = site.url ?? "";
-  if (!site.language) site.language = "zh-CN";
+  const siteRaw = readJson(fs, p("site.json"));
+  if (siteRaw === null) throw new Error("找不到基础配置文件: " + p("site.json"));
+  const siteObj = assertRecord(siteRaw, "config/site.json");
+  const site: Config["site"] = {
+    title: assertNonEmptyString(siteObj.title, "config/site.json: site.title"),
+    description: stringOr(siteObj.description, "", "config/site.json: site.description"),
+    author: stringOr(siteObj.author, "", "config/site.json: site.author"),
+    url: stringOr(siteObj.url, "", "config/site.json: site.url"),
+    language: stringOr(siteObj.language, "zh-CN", "config/site.json: site.language"),
+  };
+  validateSiteUrl(site.url);
+  validateLanguage(site.language);
 
   // ---- 基础: build.json (必需, 含 build + pagination) ----
-  const buildFile = readJson(fs, p("build.json"));
-  if (!buildFile) throw new Error("找不到基础配置文件: " + p("build.json"));
-  const build = buildFile.build;
-  const pagination = buildFile.pagination;
-  if (!build?.publishedLabel)
-    throw new Error("config/build.json: build.publishedLabel 缺失");
-  if (!build.metaMarker) throw new Error("config/build.json: build.metaMarker 缺失");
-  if (!build.pageLabel) throw new Error("config/build.json: build.pageLabel 缺失");
-  if (!build.dirPrefix) throw new Error("config/build.json: build.dirPrefix 缺失");
-  build.postDir = normalizePostDir(build.postDir);
-  build.contentDir = normalizeContentDir(build.contentDir);
-  if (build.excludedLabels !== undefined) {
+  const buildFileRaw = readJson(fs, p("build.json"));
+  if (buildFileRaw === null) throw new Error("找不到基础配置文件: " + p("build.json"));
+  const buildFile = assertRecord(buildFileRaw, "config/build.json");
+  const buildRaw = assertRecord(buildFile.build, "config/build.json: build");
+  const paginationRaw = assertRecord(buildFile.pagination, "config/build.json: pagination");
+  const build: Config["build"] = {
+    publishedLabel: assertNonEmptyString(
+      buildRaw.publishedLabel,
+      "config/build.json: build.publishedLabel",
+    ),
+    metaMarker: assertNonEmptyString(buildRaw.metaMarker, "config/build.json: build.metaMarker"),
+    pageLabel: assertNonEmptyString(buildRaw.pageLabel, "config/build.json: build.pageLabel"),
+    dirPrefix: assertNonEmptyString(buildRaw.dirPrefix, "config/build.json: build.dirPrefix"),
+    postDir: normalizePostDir(buildRaw.postDir),
+    contentDir: normalizeContentDir(buildRaw.contentDir),
+    excludedLabels: [],
+  };
+  if (buildRaw.excludedLabels !== undefined) {
     if (
-      !Array.isArray(build.excludedLabels) ||
-      !build.excludedLabels.every((s: unknown) => typeof s === "string")
+      !Array.isArray(buildRaw.excludedLabels) ||
+      !buildRaw.excludedLabels.every((s: unknown) => typeof s === "string")
     )
       throw new Error("config/build.json: build.excludedLabels 必须为字符串数组");
-  } else {
-    build.excludedLabels = [];
+    build.excludedLabels = buildRaw.excludedLabels as string[];
   }
   for (const k of ["home", "archive", "directory", "tag"] as const) {
-    if (!isPositiveInt(pagination?.[k]))
+    if (!isPositiveInt(paginationRaw[k]))
       throw new Error("config/build.json: pagination." + k + " 必须为正整数");
   }
+  const pagination: Config["pagination"] = {
+    home: paginationRaw.home as number,
+    archive: paginationRaw.archive as number,
+    directory: paginationRaw.directory as number,
+    tag: paginationRaw.tag as number,
+  };
 
   // ---- 扩展: feed.json (可选, 缺省关闭) ----
-  const feedFile = readJson(fs, p("feed.json"));
+  const feedFileRaw = readJson(fs, p("feed.json"));
   let rss: Config["rss"];
-  if (!feedFile) {
+  if (feedFileRaw === null) {
     rss = { enabled: false, formats: [], count: 10, summaryLength: 0 };
   } else {
+    const feedFile = assertRecord(feedFileRaw, "config/feed.json");
     if (typeof feedFile.enabled !== "boolean")
       throw new Error("config/feed.json: enabled 必须为布尔");
     if (feedFile.enabled) {
       if (
         !Array.isArray(feedFile.formats) ||
         feedFile.formats.length === 0 ||
-        !feedFile.formats.every((f: string) => FEED_FORMATS.has(f))
+        !feedFile.formats.every((f) => typeof f === "string" && FEED_FORMATS.has(f))
       )
         throw new Error("config/feed.json: formats 必须为 rss/atom/json 的非空子集");
       if (!isPositiveInt(feedFile.count))
@@ -164,8 +248,8 @@ export function loadConfig(fs: FileStore, dir: string = "config"): Config {
     rss = {
       enabled: feedFile.enabled,
       formats: (feedFile.formats ?? []) as FeedFormat[],
-      count: feedFile.count ?? 10,
-      summaryLength: feedFile.summaryLength ?? 0,
+      count: typeof feedFile.count === "number" ? feedFile.count : 10,
+      summaryLength: typeof feedFile.summaryLength === "number" ? feedFile.summaryLength : 0,
     };
   }
   // rss 启用时才强制 site.url (RSS 需绝对链接).
@@ -175,14 +259,7 @@ export function loadConfig(fs: FileStore, dir: string = "config"): Config {
   // ---- 扩展: comments.json (可选, 缺省关闭) ----
   const commentsFile = readJson(fs, p("comments.json"));
   const comments: Config["comments"] = commentsFile
-    ? {
-        enabled: commentsFile.enabled === true,
-        repo: commentsFile.repo ?? "",
-        repoId: commentsFile.repoId ?? "",
-        category: commentsFile.category ?? "",
-        categoryId: commentsFile.categoryId ?? "",
-        mapping: commentsFile.mapping ?? "pathname",
-      }
+    ? loadCommentsConfig(commentsFile)
     : {
         enabled: false,
         repo: "",
@@ -207,33 +284,64 @@ export function loadConfig(fs: FileStore, dir: string = "config"): Config {
     theme: appearance.theme,
     appearance,
     content,
-  } as Config;
+  };
+}
+
+function loadCommentsConfig(raw: unknown): Config["comments"] {
+  const obj = assertRecord(raw, "config/comments.json");
+  if (obj.enabled !== undefined && typeof obj.enabled !== "boolean")
+    throw new Error("config/comments.json: enabled 必须为布尔");
+  const comments: Config["comments"] = {
+    enabled: obj.enabled === true,
+    repo: obj.repo === undefined ? "" : assertString(obj.repo, "config/comments.json: repo"),
+    repoId:
+      obj.repoId === undefined ? "" : assertString(obj.repoId, "config/comments.json: repoId"),
+    category:
+      obj.category === undefined
+        ? ""
+        : assertString(obj.category, "config/comments.json: category"),
+    categoryId:
+      obj.categoryId === undefined
+        ? ""
+        : assertString(obj.categoryId, "config/comments.json: categoryId"),
+    mapping:
+      obj.mapping === undefined
+        ? "pathname"
+        : assertString(obj.mapping, "config/comments.json: mapping"),
+  };
+  validateGiscusComments(comments);
+  return comments;
 }
 
 // 解析 appearance.json (含默认兜底与外链/ logo 校验). raw 为 null 时返回全默认.
-function loadAppearance(raw: any | null, siteTitle: string): AppearanceConfig {
+function loadAppearance(raw: unknown | null, siteTitle: string): AppearanceConfig {
+  const obj = raw === null ? undefined : assertRecord(raw, "config/appearance.json");
+  const themeObj = optionalRecord(obj?.theme, "config/appearance.json: theme");
+  const logoObj = optionalRecord(obj?.logo, "config/appearance.json: logo");
+  const footerObj = optionalRecord(obj?.footer, "config/appearance.json: footer");
   const theme: ThemeSelection = {
-    name: (raw?.theme?.name && String(raw.theme.name)) || "default",
-    skin: raw?.theme?.skin ? String(raw.theme.skin) : "",
+    name: stringOr(themeObj?.name, "default", "config/appearance.json: theme.name"),
+    skin: stringOr(themeObj?.skin, "", "config/appearance.json: theme.skin"),
   };
   if (!theme.name) throw new Error("config/appearance.json: theme.name 不能为空");
 
   let logo: LogoConfig;
-  if (raw?.logo) {
-    if (raw.logo.type !== "text" && raw.logo.type !== "image")
+  if (logoObj) {
+    if (logoObj.type !== "text" && logoObj.type !== "image")
       throw new Error("config/appearance.json: logo.type 必须为 text 或 image");
-    if (typeof raw.logo.value !== "string" || raw.logo.value.trim() === "")
+    if (typeof logoObj.value !== "string" || logoObj.value.trim() === "")
       throw new Error("config/appearance.json: logo.value 必须为非空字符串");
-    logo = { type: raw.logo.type, value: raw.logo.value };
+    logo = { type: logoObj.type, value: logoObj.value };
   } else {
     logo = { type: "text", value: siteTitle };
   }
 
   const links: LinkItem[] = [];
-  if (raw?.links !== undefined) {
-    if (!Array.isArray(raw.links))
+  if (obj?.links !== undefined) {
+    if (!Array.isArray(obj.links))
       throw new Error("config/appearance.json: links 必须为数组");
-    for (const it of raw.links) {
+    for (const item of obj.links) {
+      const it = assertRecord(item, "config/appearance.json: links[]");
       if (!it || typeof it.label !== "string" || typeof it.href !== "string")
         throw new Error("config/appearance.json: links[] 需含 label/href 字符串");
       if (!/^https?:\/\//i.test(it.href))
@@ -245,10 +353,10 @@ function loadAppearance(raw: any | null, siteTitle: string): AppearanceConfig {
   }
 
   const footer = {
-    copyright: raw?.footer?.copyright ?? "",
-    icp: raw?.footer?.icp ?? "",
-    police: raw?.footer?.police ?? "",
-    policeCode: raw?.footer?.policeCode ?? "",
+    copyright: stringOr(footerObj?.copyright, "", "config/appearance.json: footer.copyright"),
+    icp: stringOr(footerObj?.icp, "", "config/appearance.json: footer.icp"),
+    police: stringOr(footerObj?.police, "", "config/appearance.json: footer.police"),
+    policeCode: stringOr(footerObj?.policeCode, "", "config/appearance.json: footer.policeCode"),
   };
 
   return { theme, logo, links, footer };
@@ -280,30 +388,44 @@ function boolOr(v: unknown, def: boolean, label: string): boolean {
  * 解析 content.json (功能增强开关与参数). raw 为 null 时全默认.
  * 各项独立开关; 数值正整数/区间、share.networks 白名单、errorPages.codes 有效 HTTP 码均 fail-fast 中文错误.
  */
-function loadContentConfig(raw: any | null): ContentConfig {
-  const r = raw ?? {};
+function loadContentConfig(raw: unknown | null): ContentConfig {
+  const r = raw === null ? {} : assertRecord(raw, "config/content.json");
+  const toc = optionalRecord(r.toc, "config/content.json: toc");
+  const readingTime = optionalRecord(r.readingTime, "config/content.json: readingTime");
+  const summary = optionalRecord(r.summary, "config/content.json: summary");
+  const cover = optionalRecord(r.cover, "config/content.json: cover");
+  const math = optionalRecord(r.math, "config/content.json: math");
+  const codeCopy = optionalRecord(r.codeCopy, "config/content.json: codeCopy");
+  const imageZoom = optionalRecord(r.imageZoom, "config/content.json: imageZoom");
+  const share = optionalRecord(r.share, "config/content.json: share");
+  const widgets = optionalRecord(r.widgets, "config/content.json: widgets");
+  const og = optionalRecord(r.og, "config/content.json: og");
+  const canonical = optionalRecord(r.canonical, "config/content.json: canonical");
+  const jsonLd = optionalRecord(r.jsonLd, "config/content.json: jsonLd");
+  const webp = optionalRecord(r.webp, "config/content.json: webp");
+  const errorPages = optionalRecord(r.errorPages, "config/content.json: errorPages");
 
   // share.networks: 缺省四项; 提供则须为白名单字符串数组.
   let networks: string[] = ["copy", "x", "telegram", "weibo"];
-  if (r.share?.networks !== undefined) {
+  if (share?.networks !== undefined) {
     if (
-      !Array.isArray(r.share.networks) ||
-      !r.share.networks.every(
+      !Array.isArray(share.networks) ||
+      !share.networks.every(
         (s: unknown) => typeof s === "string" && SHARE_NETWORKS.has(s),
       )
     )
       throw new Error(
         "config/content.json: share.networks 必须为白名单字符串数组 (copy/x/twitter/telegram/weibo/facebook/linkedin/reddit/whatsapp/email)",
       );
-    networks = r.share.networks as string[];
+    networks = share.networks as string[];
   }
 
   // errorPages.codes: 缺省 404/403/500; 提供则须为有效 HTTP 码 (100-599) 数组 (允许空 = 不生成).
   let codes: number[] = [404, 403, 500];
-  if (r.errorPages?.codes !== undefined) {
+  if (errorPages?.codes !== undefined) {
     if (
-      !Array.isArray(r.errorPages.codes) ||
-      !r.errorPages.codes.every(
+      !Array.isArray(errorPages.codes) ||
+      !errorPages.codes.every(
         (c: unknown) =>
           typeof c === "number" && Number.isInteger(c) && c >= 100 && c <= 599,
       )
@@ -311,36 +433,36 @@ function loadContentConfig(raw: any | null): ContentConfig {
       throw new Error(
         "config/content.json: errorPages.codes 必须为有效 HTTP 码 (100-599) 数组",
       );
-    codes = r.errorPages.codes as number[];
+    codes = errorPages.codes as number[];
   }
 
   return {
     toc: {
-      enabled: boolOr(r.toc?.enabled, true, "toc.enabled"),
-      minHeadings: posIntOr(r.toc?.minHeadings, 2, "toc.minHeadings"),
-      pcCollapseBelow: posIntOr(r.toc?.pcCollapseBelow, 5, "toc.pcCollapseBelow"),
+      enabled: boolOr(toc?.enabled, true, "toc.enabled"),
+      minHeadings: posIntOr(toc?.minHeadings, 2, "toc.minHeadings"),
+      pcCollapseBelow: posIntOr(toc?.pcCollapseBelow, 5, "toc.pcCollapseBelow"),
     },
     readingTime: {
-      enabled: boolOr(r.readingTime?.enabled, true, "readingTime.enabled"),
-      cpm: posIntOr(r.readingTime?.cpm, 400, "readingTime.cpm"),
-      wpm: posIntOr(r.readingTime?.wpm, 250, "readingTime.wpm"),
+      enabled: boolOr(readingTime?.enabled, true, "readingTime.enabled"),
+      cpm: posIntOr(readingTime?.cpm, 400, "readingTime.cpm"),
+      wpm: posIntOr(readingTime?.wpm, 250, "readingTime.wpm"),
     },
     summary: {
-      enabled: boolOr(r.summary?.enabled, true, "summary.enabled"),
-      length: posIntOr(r.summary?.length, 120, "summary.length"),
+      enabled: boolOr(summary?.enabled, true, "summary.enabled"),
+      length: posIntOr(summary?.length, 120, "summary.length"),
     },
-    cover: { enabled: boolOr(r.cover?.enabled, true, "cover.enabled") },
-    math: { enabled: boolOr(r.math?.enabled, true, "math.enabled") },
-    codeCopy: { enabled: boolOr(r.codeCopy?.enabled, true, "codeCopy.enabled") },
-    imageZoom: { enabled: boolOr(r.imageZoom?.enabled, true, "imageZoom.enabled") },
-    share: { enabled: boolOr(r.share?.enabled, true, "share.enabled"), networks },
-    widgets: { enabled: boolOr(r.widgets?.enabled, true, "widgets.enabled") },
-    og: { enabled: boolOr(r.og?.enabled, true, "og.enabled") },
-    canonical: { enabled: boolOr(r.canonical?.enabled, true, "canonical.enabled") },
-    jsonLd: { enabled: boolOr(r.jsonLd?.enabled, true, "jsonLd.enabled") },
+    cover: { enabled: boolOr(cover?.enabled, true, "cover.enabled") },
+    math: { enabled: boolOr(math?.enabled, true, "math.enabled") },
+    codeCopy: { enabled: boolOr(codeCopy?.enabled, true, "codeCopy.enabled") },
+    imageZoom: { enabled: boolOr(imageZoom?.enabled, true, "imageZoom.enabled") },
+    share: { enabled: boolOr(share?.enabled, true, "share.enabled"), networks },
+    widgets: { enabled: boolOr(widgets?.enabled, true, "widgets.enabled") },
+    og: { enabled: boolOr(og?.enabled, true, "og.enabled") },
+    canonical: { enabled: boolOr(canonical?.enabled, true, "canonical.enabled") },
+    jsonLd: { enabled: boolOr(jsonLd?.enabled, true, "jsonLd.enabled") },
     webp: {
-      enabled: boolOr(r.webp?.enabled, true, "webp.enabled"),
-      quality: intInRangeOr(r.webp?.quality, 80, 1, 100, "webp.quality"),
+      enabled: boolOr(webp?.enabled, true, "webp.enabled"),
+      quality: intInRangeOr(webp?.quality, 80, 1, 100, "webp.quality"),
     },
     errorPages: { codes },
   };

@@ -2,8 +2,15 @@
 //   基础层 finalizeContent = highlight + 图片本地化 + enhanceImages, 文章与独立页共用;
 //   富化层 enrichPostContent = 标题锚点 + deriveCardMeta, 文章专属 (独立页无目录/卡片, 不富化).
 // TOC 改客户端 tocbot 从 DOM 构建, 不在此层生成.
-import type { FileStore, Highlighter, ImageDownloader } from "./types.ts";
-import { processImages, processLocalImages, enhanceImages, type ImageDim } from "./imageService.ts";
+import type { FileStore, Highlighter, ImageDownloader, ImageSource } from "./types.ts";
+import {
+  processImages,
+  processLocalImages,
+  enhanceImages,
+  type ImageDim,
+  type WebpHashConfig,
+} from "./imageService.ts";
+import { sanitizeContentHtml } from "./sanitize.ts";
 import {
   injectHeadingAnchors,
   deriveCardMeta,
@@ -18,6 +25,8 @@ export interface FinalizeDeps {
   fs: FileStore;
   imgDir: string; // 图片落盘目录 (post/<nodeId> 或独立页 <nodeId>)
   relPrefix: string; // 正文图片引用前缀 (<nodeId>/)
+  imageSource?: ImageSource; // 远程图来源上下文, 供下载器认证策略判断
+  webp?: WebpHashConfig; // 本地图内容 hash 需包含输出参数
 }
 
 /**
@@ -31,6 +40,7 @@ export async function finalizeContent(
 ): Promise<{ html: string; assets: string[] }> {
   let out = html;
   if (deps.highlighter) out = deps.highlighter.highlight(out);
+  out = sanitizeContentHtml(out);
   let dims: Record<string, ImageDim> = {};
   const assets: string[] = []; // 本次引用的图片落盘路径 (含判存命中复用), 供孤儿回收求"在用集"
   // 本地相对图先行 (issue 文章不传 localImages -> 跳过).
@@ -40,6 +50,7 @@ export async function finalizeContent(
       fs: deps.fs,
       imgDir: deps.imgDir,
       relPrefix: deps.relPrefix,
+      webp: deps.webp,
     });
     out = r.html;
     dims = { ...dims, ...r.dims };
@@ -51,6 +62,7 @@ export async function finalizeContent(
       fs: deps.fs,
       imgDir: deps.imgDir,
       relPrefix: deps.relPrefix,
+      imageSource: deps.imageSource,
     });
     out = r.html;
     dims = { ...dims, ...r.dims };

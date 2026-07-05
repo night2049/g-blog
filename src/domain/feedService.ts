@@ -8,6 +8,7 @@ import type {
   FileStore,
   Manifest,
 } from "./types.ts";
+import * as parse5 from "parse5";
 import { takeLatest } from "./manifestService.ts";
 import { extractContentHtml } from "./contentMarkers.ts";
 import { htmlToText, truncate } from "./text.ts";
@@ -21,15 +22,80 @@ export function joinUrl(baseUrl: string, rel: string): string {
   return baseUrl.replace(/\/+$/, "") + "/" + rel.replace(/^\/+/, "");
 }
 
-// 正文内相对 src/href 改为绝对; http(s)/协议相对/#/mailto/data 保持不变.
-export function absolutizeUrls(html: string, baseUrl: string): string {
-  return html.replace(
-    /(\s(?:src|href)=")([^"]*)(")/gi,
-    (m, pre, url, post) => {
-      if (/^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|#)/.test(url)) return m;
-      return pre + joinUrl(baseUrl, url) + post;
-    },
+function shouldKeepUrl(url: string): boolean {
+  const v = url.trim();
+  return (
+    v === "" ||
+    /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|#)/.test(v)
   );
+}
+
+function absolutizeOne(url: string, baseUrl: string): string {
+  if (shouldKeepUrl(url)) return url;
+  try {
+    return new URL(url, baseUrl).toString();
+  } catch {
+    return url;
+  }
+}
+
+function absolutizeSrcset(srcset: string, baseUrl: string): string {
+  return srcset
+    .split(",")
+    .map((part) => {
+      const trimmed = part.trim();
+      if (!trimmed) return part;
+      const pieces = trimmed.split(/\s+/);
+      const url = pieces.shift()!;
+      return [absolutizeOne(url, baseUrl), ...pieces].join(" ");
+    })
+    .join(", ");
+}
+
+function setAttr(node: any, name: string, value: string): void {
+  const attr = node.attrs?.find((a: any) => a.name === name);
+  if (attr) attr.value = value;
+}
+
+function getAttr(node: any, name: string): string | null {
+  return node.attrs?.find((a: any) => a.name === name)?.value ?? null;
+}
+
+function absolutizeNodeAttrs(node: any, baseUrl: string): void {
+  const tag = node.tagName;
+  if (!tag || !node.attrs) return;
+
+  const resourceAttrs: Record<string, string[]> = {
+    img: ["src"],
+    source: ["src"],
+    video: ["src", "poster"],
+    audio: ["src"],
+    track: ["src"],
+  };
+  for (const attr of resourceAttrs[tag] ?? []) {
+    const value = getAttr(node, attr);
+    if (value !== null) setAttr(node, attr, absolutizeOne(value, baseUrl));
+  }
+  if (tag === "source") {
+    const srcset = getAttr(node, "srcset");
+    if (srcset !== null) setAttr(node, "srcset", absolutizeSrcset(srcset, baseUrl));
+  }
+  if (tag === "a") {
+    const href = getAttr(node, "href");
+    if (href !== null) setAttr(node, "href", absolutizeOne(href, baseUrl));
+  }
+}
+
+function walk(node: any, fn: (node: any) => void): void {
+  fn(node);
+  for (const child of node.childNodes ?? []) walk(child, fn);
+}
+
+// 正文内相对资源 URL 改为绝对; 绝对/协议相对/#/mailto/tel/data 保持不变.
+export function absolutizeUrls(html: string, baseUrl: string): string {
+  const fragment = parse5.parseFragment(html);
+  walk(fragment, (node) => absolutizeNodeAttrs(node, baseUrl));
+  return parse5.serialize(fragment);
 }
 
 // 摘要/全文二选一: summaryLength>0 取纯文本摘要; =0 取绝对化全文.
@@ -82,12 +148,13 @@ export function buildFeedItems(deps: {
       continue;
     }
     const link = joinUrl(cfg.site.url, e.url);
+    const contentBase = new URL(".", link).toString();
     items.push({
       id: link,
       title: e.title,
       link,
       date: e.date,
-      ...buildItemBody(content, cfg.rss.summaryLength, cfg.site.url),
+      ...buildItemBody(content, cfg.rss.summaryLength, contentBase),
     });
   }
   return items;
@@ -99,9 +166,16 @@ export function writeFeeds(
   feeds: { rss: string; atom: string; json: string },
   formats: Config["rss"]["formats"],
 ): void {
+  removeFeeds(fs);
   if (formats.includes("rss")) fs.write("feed.xml", feeds.rss);
   if (formats.includes("atom")) fs.write("atom.xml", feeds.atom);
   if (formats.includes("json")) fs.write("feed.json", feeds.json);
+}
+
+export function removeFeeds(fs: FileStore): void {
+  fs.remove("feed.xml");
+  fs.remove("atom.xml");
+  fs.remove("feed.json");
 }
 
 // 编排: 组装 items + channel -> 交 FeedRenderer 渲染 -> 写文件. rss.enabled 由调用方判断.

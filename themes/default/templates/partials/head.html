@@ -47,7 +47,7 @@
           var f = document.querySelector("iframe.giscus-frame");
           if (f && f.contentWindow)
             f.contentWindow.postMessage(
-              { giscus: { setConfig: { theme: dark ? "{{giscusThemeDark}}" : "{{giscusThemeLight}}" } } },
+              { giscus: { setConfig: { theme: dark ? "{{giscusThemeDarkJsContent}}" : "{{giscusThemeLightJsContent}}" } } },
               "https://giscus.app",
             );
         }

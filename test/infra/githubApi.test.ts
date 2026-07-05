@@ -38,7 +38,7 @@ test("listIssues 过滤 pull_request 并映射", async () => {
     labels: "published",
   });
   expect(r.length).toBe(1);
-  expect(r[0].node_id).toBe("I_1");
+  expect(r[0]!.node_id).toBe("I_1");
 });
 
 test("listIssues 分页合并两页", async () => {
@@ -72,4 +72,14 @@ test("listIssues 分页合并两页", async () => {
     labels: "published",
   });
   expect(r.length).toBe(101);
+});
+
+test("listIssues 非数组响应抛错", async () => {
+  const fakeFetch = (async () => jsonRes({ message: "bad" })) as unknown as typeof fetch;
+  await expect(
+    createGitHubApi("token", fakeFetch).listIssues("owner/repo", {
+      state: "open",
+      labels: "published",
+    }),
+  ).rejects.toThrow("不是数组");
 });

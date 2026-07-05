@@ -12,7 +12,7 @@ import {
   fixtureConfig,
   makeIssue,
 } from "./fakes.ts";
-import type { FileStore, RawIssue } from "../src/domain/types.ts";
+import type { FileStore, ImageSource, RawIssue } from "../src/domain/types.ts";
 
 const templates = fakeThemeProvider();
 const manifest = fakeThemeManifest();
@@ -26,6 +26,7 @@ const run = (issue: RawIssue, fs: FileStore, action: string | null = null) =>
     fs,
     md,
     cfg,
+    repo: "owner/repo",
     templates,
     manifest,
     chrome,
@@ -261,6 +262,7 @@ describe("feed 开关", () => {
       fs,
       md,
       cfg: cfg2,
+      repo: "owner/repo",
       templates,
       manifest,
       chrome,
@@ -279,6 +281,7 @@ test("发布含远程图: 下载改写为本地路径并写入字节", async () 
     fs,
     md,
     cfg,
+    repo: "owner/repo",
     templates,
     manifest,
     chrome,
@@ -292,5 +295,29 @@ test("发布含远程图: 下载改写为本地路径并写入字节", async () 
   expect(d["post/I_img.html"]).not.toContain("assets/img/");
   const byteKeys = Object.keys(fs.dumpBytes());
   expect(byteKeys.length).toBe(1);
-  expect(byteKeys[0].startsWith("post/I_img/")).toBe(true);
+  expect(byteKeys[0]!.startsWith("post/I_img/")).toBe(true);
+});
+
+test("发布含远程图: GitHub issue 来源语义传给图片下载器", async () => {
+  const fs = memFileStore();
+  const u = "https://x/p.png";
+  const seen: ImageSource[] = [];
+  await runIncremental({
+    events: fakeEventSource(makeIssue({ number: 42, node_id: "I_img", body: `<img src="${u}">` }), null),
+    fs,
+    md,
+    cfg,
+    repo: "owner/repo",
+    templates,
+    manifest,
+    chrome,
+    feedRenderer: fakeFeedRenderer(),
+    images: {
+      download: async (_url, source) => {
+        if (source) seen.push(source);
+        return { bytes: new Uint8Array([1]), ext: "png" };
+      },
+    },
+  });
+  expect(seen).toEqual([{ kind: "github-issue", repo: "owner/repo", issueNumber: 42 }]);
 });

@@ -11,12 +11,31 @@ import type {
 import { joinUrl } from "./feedService.ts";
 
 // 转义 HTML 文本中的特殊字符 (用于标题等用户输入).
-export function escapeHtml(s: string): string {
-  return s
+export function escapeHtmlText(s: string): string {
+  return String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// 转义双引号 HTML 属性值; 额外转义单引号, 便于未来复用到单引号属性.
+export function escapeHtmlAttr(s: string): string {
+  return escapeHtmlText(s)
+    .replace(/'/g, "&#39;");
+}
+
+export function jsStringLiteral(s: string): string {
+  return JSON.stringify(String(s)).replace(/</g, "\\u003c");
+}
+
+export function jsStringContent(s: string): string {
+  const literal = jsStringLiteral(s);
+  return literal.slice(1, -1);
+}
+
+export function escapeHtml(s: string): string {
+  return escapeHtmlText(s);
 }
 
 // 替换模板中的 {{key}} 占位; 未提供的 key 替换为空串. 不处理 {{> partial}} (含 > 不匹配 \w+).
@@ -38,7 +57,7 @@ function renderWidgets(names?: string[]): string {
     .map((n) => {
       const attrs = WIDGET_DEFAULTS[n] ?? {};
       const a = Object.entries(attrs)
-        .map(([k, v]) => ` ${k}="${v}"`)
+        .map(([k, v]) => ` ${k}="${escapeHtmlAttr(v)}"`)
         .join("");
       return `<${n}${a}></${n}>`;
     })
@@ -53,10 +72,10 @@ function renderScripts(
   rootPrefix: string,
 ): string {
   const tags = (scripts ?? []).map(
-    (s) => `<script src="${rootPrefix}${s}" defer></script>`,
+    (s) => `<script src="${escapeHtmlAttr(rootPrefix + s)}" defer></script>`,
   );
   if (widgets && widgets.length > 0)
-    tags.push(`<script src="${rootPrefix}widgets.js" defer></script>`);
+    tags.push(`<script src="${escapeHtmlAttr(rootPrefix + "widgets.js")}" defer></script>`);
   return tags.join("\n    ");
 }
 
@@ -98,7 +117,12 @@ export function assemblePage(
   const rootPrefix = vars.rootPrefix || "./";
   const merged: Record<string, string> = {
     ...vars,
-    rootPrefix,
+    rootPrefix: escapeHtmlAttr(rootPrefix),
+    lang: escapeHtmlAttr(vars.lang || ""),
+    giscusThemeLightJs: jsStringLiteral(vars.giscusThemeLight || "light"),
+    giscusThemeDarkJs: jsStringLiteral(vars.giscusThemeDark || "dark"),
+    giscusThemeLightJsContent: jsStringContent(vars.giscusThemeLight || "light"),
+    giscusThemeDarkJsContent: jsStringContent(vars.giscusThemeDark || "dark"),
     widgets: renderWidgets(manifest.widgets[pageType]),
     scripts: renderScripts(
       manifest.scripts[pageType],
@@ -151,37 +175,37 @@ function buildHeadSeo(
 ): { metaDescription: string; ogTags: string; katexCss: string } {
   const { title, description, ogType, url, image, contentHtml } = args;
   const metaDescription = description
-    ? `<meta name="description" content="${escapeHtml(description)}" />`
+    ? `<meta name="description" content="${escapeHtmlAttr(description)}" />`
     : "";
   const katexCss = katexCssFor(contentHtml);
   if (!cfg.content.og.enabled) return { metaDescription, ogTags: "", katexCss };
   const absUrl = toAbsolute(cfg.site.url, url);
   const absImage = image ? toAbsolute(cfg.site.url, image) : "";
   const tags: string[] = [
-    `<meta property="og:type" content="${escapeHtml(ogType)}" />`,
-    `<meta property="og:title" content="${escapeHtml(title)}" />`,
-    `<meta property="og:site_name" content="${escapeHtml(cfg.site.title)}" />`,
+    `<meta property="og:type" content="${escapeHtmlAttr(ogType)}" />`,
+    `<meta property="og:title" content="${escapeHtmlAttr(title)}" />`,
+    `<meta property="og:site_name" content="${escapeHtmlAttr(cfg.site.title)}" />`,
   ];
   if (description)
-    tags.push(`<meta property="og:description" content="${escapeHtml(description)}" />`);
-  if (absUrl) tags.push(`<meta property="og:url" content="${escapeHtml(absUrl)}" />`);
-  if (absImage) tags.push(`<meta property="og:image" content="${escapeHtml(absImage)}" />`);
+    tags.push(`<meta property="og:description" content="${escapeHtmlAttr(description)}" />`);
+  if (absUrl) tags.push(`<meta property="og:url" content="${escapeHtmlAttr(absUrl)}" />`);
+  if (absImage) tags.push(`<meta property="og:image" content="${escapeHtmlAttr(absImage)}" />`);
   tags.push(
     `<meta name="twitter:card" content="${absImage ? "summary_large_image" : "summary"}" />`,
   );
-  tags.push(`<meta name="twitter:title" content="${escapeHtml(title)}" />`);
+  tags.push(`<meta name="twitter:title" content="${escapeHtmlAttr(title)}" />`);
   if (description)
-    tags.push(`<meta name="twitter:description" content="${escapeHtml(description)}" />`);
+    tags.push(`<meta name="twitter:description" content="${escapeHtmlAttr(description)}" />`);
   return { metaDescription, ogTags: tags.join("\n    "), katexCss };
 }
 
 // canonical 规范链接 (仅文章页/单页, 由各 render 函数调用; 列表页/错误页不调用即不输出).
-// 复用 toAbsolute, 与 og:url 同源; site.url 为空则不输出 (相对 canonical 有害), href 经 escapeHtml.
+// 复用 toAbsolute, 与 og:url 同源; site.url 为空则不输出 (相对 canonical 有害), href 经属性转义.
 export function buildCanonical(cfg: Config, url: string): string {
   // site.url 为空 -> 不输出 (toAbsolute 在无 site.url 时退回相对路径, 相对 canonical 有害).
   if (!cfg.content.canonical.enabled || !cfg.site.url) return "";
   const abs = toAbsolute(cfg.site.url, url);
-  return abs ? `<link rel="canonical" href="${escapeHtml(abs)}" />` : "";
+  return abs ? `<link rel="canonical" href="${escapeHtmlAttr(abs)}" />` : "";
 }
 
 // JSON-LD 注入 <script> 块: JSON.stringify 后把 < 转义为 \u003c, 防正文中的 </script> 截断脚本.
@@ -260,7 +284,7 @@ function contentFlagsScript(cfg: Config): string {
     share: { enabled: c.share.enabled, networks: c.share.networks },
     widgets: c.widgets.enabled,
   };
-  return "<script>window.__content=" + JSON.stringify(flags) + "</script>";
+  return "<script>window.__content=" + JSON.stringify(flags).replace(/</g, "\\u003c") + "</script>";
 }
 
 // 列表页类型 -> 输出文件 (供 og:url; home 为根). 与 siteService.LIST_PAGES 一致但内联避免循环依赖.
@@ -295,9 +319,9 @@ export function renderPageHtml(
   });
   const vars: Record<string, string> = {
     rootPrefix,
-    pageTitle: escapeHtml(post.title) + " - " + escapeHtml(site.title),
-    title: escapeHtml(post.title),
-    siteTitle: escapeHtml(site.title),
+    pageTitle: escapeHtmlText(post.title) + " - " + escapeHtmlText(site.title),
+    title: escapeHtmlText(post.title),
+    siteTitle: escapeHtmlText(site.title),
     date: post.date,
     dateDisplay: post.date.slice(0, 10),
     content: post.contentHtml,
@@ -337,9 +361,9 @@ export function renderStandalonePageHtml(
   });
   const vars: Record<string, string> = {
     rootPrefix: "./",
-    pageTitle: escapeHtml(page.title) + " - " + escapeHtml(site.title),
-    title: escapeHtml(page.title),
-    siteTitle: escapeHtml(site.title),
+    pageTitle: escapeHtmlText(page.title) + " - " + escapeHtmlText(site.title),
+    title: escapeHtmlText(page.title),
+    siteTitle: escapeHtmlText(site.title),
     content: page.contentHtml,
     headExtra: "", // 独立页无列表数据 kickoff
     contentFlags: contentFlagsScript(cfg),
@@ -387,8 +411,8 @@ export function renderListPage(
   });
   const vars: Record<string, string> = {
     rootPrefix: "./",
-    pageTitle: escapeHtml(site.title),
-    siteTitle: escapeHtml(site.title),
+    pageTitle: escapeHtmlText(site.title),
+    siteTitle: escapeHtmlText(site.title),
     headExtra: listDataKickoff(pageType),
     contentFlags: contentFlagsScript(cfg),
     metaDescription: seo.metaDescription,
@@ -405,7 +429,9 @@ export function renderTags(tags: string[], rootPrefix: string): string {
   return tags
     .map(
       (t) =>
-        `<a class="tag tag-link" href="${rootPrefix}tag.html?tag=${encodeURIComponent(t)}">#${escapeHtml(t)}</a>`,
+        `<a class="tag tag-link" href="${escapeHtmlAttr(
+          rootPrefix + "tag.html?tag=" + encodeURIComponent(t),
+        )}">#${escapeHtmlText(t)}</a>`,
     )
     .join("");
 }
@@ -417,15 +443,15 @@ export function renderTags(tags: string[], rootPrefix: string): string {
 export function renderComments(c: Config["comments"], themeUrl?: string): string {
   if (!c.enabled) return "";
   const attrs = [
-    `data-repo="${c.repo}"`,
-    `data-repo-id="${c.repoId}"`,
-    `data-category="${c.category}"`,
-    `data-category-id="${c.categoryId}"`,
-    `data-mapping="${c.mapping}"`,
+    `data-repo="${escapeHtmlAttr(c.repo)}"`,
+    `data-repo-id="${escapeHtmlAttr(c.repoId)}"`,
+    `data-category="${escapeHtmlAttr(c.category)}"`,
+    `data-category-id="${escapeHtmlAttr(c.categoryId)}"`,
+    `data-mapping="${escapeHtmlAttr(c.mapping)}"`,
     `data-strict="1"`,
     `data-reactions-enabled="1"`,
     `data-input-position="bottom"`,
-    `data-theme="${themeUrl || "light"}"`,
+    `data-theme="${escapeHtmlAttr(themeUrl || "light")}"`,
     `data-lang="zh-CN"`,
   ].join(" ");
   return `<div id="giscus-mount" ${attrs}></div>`;

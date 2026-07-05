@@ -1,0 +1,101 @@
+/* 令牌契约 (主题内公开接缝): 结构 CSS 只消费 --gb-*, 皮肤只定义取值.
+   本文件写"全令牌兜底"默认值; 皮肤 (skins/*.css) 覆盖颜色/字体族/代码高亮取值.
+   命名参考 MD3 角色, 取值不绑定 MD. 改名/删除属破坏性变更, 须同步 layout.css 与所有皮肤. */
+
+:root {
+  /* ---- 形状 (圆角) ---- */
+  --gb-shape-xs: 4px;
+  --gb-shape-sm: 8px;
+  --gb-shape-md: 12px; /* 输入/代码块 */
+  --gb-shape-lg: 16px; /* 卡片 */
+  --gb-shape-xl: 32px; /* 弹层/大卡/正文纸张/浮动顶栏 (统一大圆角) */
+  --gb-shape-full: 9999px; /* chip/按钮/FAB 胶囊 */
+
+  /* ---- 间距阶梯 (4/8/12/16/24/32/48/64) ---- */
+  --gb-space-1: 4px;
+  --gb-space-2: 8px;
+  --gb-space-3: 12px;
+  --gb-space-4: 16px;
+  --gb-space-5: 24px;
+  --gb-space-6: 32px;
+  --gb-space-7: 48px;
+  --gb-space-8: 64px;
+
+  /* ---- 密度系数 / 容器留白 / 阅读宽度 ---- */
+  --gb-density: 1; /* 卡内边距与卡间距随密度可压缩 */
+  --gb-gutter: 16px; /* 窄屏左右内边距; 宽屏在 layout.css 放宽 */
+  --gb-measure: 48rem; /* .page 阅读栏最大宽度 */
+
+  /* ---- 层级 (z-index) ---- */
+  --gb-z-base: 0;
+  --gb-z-sticky: 100;
+  --gb-z-overlay: 1000;
+  --gb-z-fab: 1100;
+  --gb-z-toast: 1200;
+
+  /* ---- 字体族 (兜底: 系统栈; 皮肤覆盖为 Inter/JetBrains/Noto Sans SC) ---- */
+  --gb-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --gb-font-display: var(--gb-font-body);
+  --gb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* ---- 字号 (type scale; display/headline 用 clamp 做响应式自适应) ---- */
+  --gb-text-display: clamp(1.75rem, 1.15rem + 2.6vw, 2.25rem);
+  --gb-text-headline: clamp(1.4rem, 1.05rem + 1.5vw, 1.75rem);
+  --gb-text-title: 1.125rem;
+  --gb-text-body: 1rem;
+  --gb-text-label: 0.8125rem;
+
+  /* ---- 颜色角色 (兜底: 中性灰阶 + 蓝主色; 皮肤覆盖为各皮肤调色) ---- */
+  --gb-primary: #3b5bdb;
+  --gb-on-primary: #ffffff;
+  --gb-primary-container: #eef2ff;
+  --gb-on-primary-container: #1c2e6b;
+  --gb-secondary: #71717a;
+  --gb-on-secondary: #ffffff;
+  --gb-error: #dc2626;
+  --gb-on-error: #ffffff;
+  --gb-outline: #d4d4d8;
+  --gb-outline-variant: #e8e8ea;
+
+  /* ---- 表层 (纯白基底, 卡片靠 hairline 描边分层; 仅 hover/弹层用极浅中性灰) ---- */
+  --gb-surface: #ffffff;
+  --gb-surface-dim: #ffffff;
+  --gb-surface-bright: #ffffff;
+  --gb-surface-container-lowest: #ffffff;
+  --gb-surface-container-low: #ffffff; /* 卡片底 = 纯白 */
+  --gb-surface-container: #ffffff;
+  --gb-surface-container-high: #f4f4f5; /* 悬浮/hover */
+  --gb-surface-container-highest: #e4e4e7; /* 弹层 */
+  --gb-on-surface: #18181b;
+  --gb-on-surface-variant: #71717a;
+
+  /* ---- 阴影 (默认极弱; 仅 FAB/弹层用) ---- */
+  --gb-shadow-1: 0 1px 2px rgba(24, 24, 27, 0.05);
+  --gb-shadow-2: 0 6px 24px rgba(24, 24, 27, 0.08);
+  /* "纸张"用极淡投影 (正文/评论/浮动顶栏共用; 纯黑暗色上不可见, 由描边代偿) */
+  --gb-shadow-paper: 0 1px 2px rgba(24, 24, 27, 0.03), 0 6px 22px rgba(24, 24, 27, 0.045);
+
+  /* ---- 状态层 (主色按 8/10/10% 叠在表层, 替代位移抬升) ---- */
+  --gb-state-hover: color-mix(in srgb, var(--gb-primary) 8%, transparent);
+  --gb-state-focus: color-mix(in srgb, var(--gb-primary) 10%, transparent);
+  --gb-state-pressed: color-mix(in srgb, var(--gb-primary) 10%, transparent);
+  --gb-focus-ring: var(--gb-primary);
+
+  /* ---- 代码高亮调色板 (兜底: github 浅色; 皮肤覆盖 :root/.dark) ---- */
+  --gb-hl-bg: #fafafa;
+  --gb-hl-fg: #24292e;
+  --gb-hl-comment: #6a737d;
+  --gb-hl-keyword: #d73a49;
+  --gb-hl-func: #6f42c1;
+  --gb-hl-string: #032f62;
+  --gb-hl-number: #005cc5;
+  --gb-hl-variable: #e36209;
+  --gb-hl-section: #22863a;
+
+  /* ---- 功能增强新增令牌 (本轮) ----
+     纯尺寸者 (toc/error/tagcloud) 仅此处兜底, 无需皮肤覆盖; 配色类 (zoom-overlay) 皮肤给浅/纯黑值. */
+  --gb-toc-width: 14rem; /* 桌面左栏目录卡片宽度 (纯尺寸) */
+  --gb-zoom-overlay: rgba(24, 24, 27, 0.72); /* 灯箱遮罩 (皮肤覆盖: 浅色半透黑 / 纯黑更深) */
+  --gb-error-code-size: clamp(6rem, 22vw, 13rem); /* 错误页超大码字 */
+}

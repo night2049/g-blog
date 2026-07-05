@@ -42,11 +42,12 @@ test("全量: 文章 + 独立页分流, 分片(years/year/dirs/dir)/pages/site/c
   ];
   const fs = memFileStore();
   const feedRenderer = fakeFeedRenderer();
+  const cfg = fixtureConfig();
   await runFull({
     api: fakeGitHubApi(issues),
     fs,
     md: fakeMarkdown(),
-    cfg: fixtureConfig(),
+    cfg,
     repo: "owner/repo",
     templates,
     manifest,
@@ -88,7 +89,7 @@ test("全量: 文章 + 独立页分流, 分片(years/year/dirs/dir)/pages/site/c
   expect(typeof chromeData.nav).toBe("string");
   // feed 被渲染, items 为文章 (不含独立页)
   expect(feedRenderer.calls.length).toBe(1);
-  expect(feedRenderer.calls[0].items.map((i) => i.title)).toEqual(["二", "一"]);
+  expect(feedRenderer.calls[0]!.items.map((i) => i.title)).toEqual(["二", "一"]);
   // 列表页外壳: 组装写出 (非拷贝), 含挂载点
   expect(d["index.html"]).toContain('id="posts"');
   expect(d["archive.html"]).toContain('id="years"');
@@ -103,7 +104,7 @@ test("全量: 文章 + 独立页分流, 分片(years/year/dirs/dir)/pages/site/c
 test("rss.enabled=false 不生成 feed", async () => {
   const cfg = fixtureConfig();
   cfg.rss.enabled = false;
-  const fs = memFileStore();
+  const fs = memFileStore({ "feed.xml": "OLD", "atom.xml": "OLD", "feed.json": "OLD" });
   const feedRenderer = fakeFeedRenderer();
   await runFull({
     api: fakeGitHubApi([makeIssue({ node_id: "I_1", body: "a" })]),
@@ -119,6 +120,8 @@ test("rss.enabled=false 不生成 feed", async () => {
   });
   expect(feedRenderer.calls.length).toBe(0);
   expect("feed.xml" in fs.dump()).toBe(false);
+  expect("atom.xml" in fs.dump()).toBe(false);
+  expect("feed.json" in fs.dump()).toBe(false);
 });
 
 test("全量前清空站点: 清除旧版孤儿产物, 保留白名单", async () => {
@@ -156,8 +159,8 @@ test("全量前清空站点: 清除旧版孤儿产物, 保留白名单", async (
   expect(d["post/I_1.html"]).toBeTruthy();
 });
 
-import type { ImageDownloader, LocalPost } from "../src/domain/types.ts";
-import { hashUrl } from "../src/domain/imageService.ts";
+import type { ImageDownloader, ImageSource, LocalPost } from "../src/domain/types.ts";
+import { hashLocalImage } from "../src/domain/imageService.ts";
 
 test("双源合并: Issues + 本地 md (文章/独立页/本地相对图)", async () => {
   const issues = [
@@ -193,16 +196,19 @@ test("双源合并: Issues + 本地 md (文章/独立页/本地相对图)", asyn
   // 本地图 reader 工厂: 仅识别 pic.png; 与真实 createLocalImageReader 同形 (装配层注入).
   const localImageReader = (_baseDir: string): ImageDownloader => ({
     download: async (relSrc) =>
-      relSrc === "pic.png" ? { bytes: picBytes, ext: "png" } : null,
+      relSrc === "pic.png"
+        ? { bytes: picBytes, ext: "png", sourceBytes: picBytes, sourceExt: "png" }
+        : null,
   });
 
   const fs = memFileStore();
   const feedRenderer = fakeFeedRenderer();
+  const cfg = fixtureConfig();
   await runFull({
     api: fakeGitHubApi(issues),
     fs,
     md: fakeMarkdown(),
-    cfg: fixtureConfig(),
+    cfg,
     repo: "owner/repo",
     templates,
     manifest,
@@ -225,9 +231,145 @@ test("双源合并: Issues + 本地 md (文章/独立页/本地相对图)", asyn
   expect(urls).toContain("post/I_iss.html");
   expect(urls).toContain("post/abc.html");
   // 本地相对图落盘到 post/abc/<hash>.png, 正文改写为相对引用
-  const picName = `${hashUrl("pic.png")}.png`;
+  const picName = `${hashLocalImage(picBytes, "png", cfg.content.webp)}.png`;
   expect(fs.dumpBytes()[`post/abc/${picName}`]).toEqual(picBytes);
   expect(d["post/abc.html"]).toContain(`abc/${picName}`);
+});
+
+test("全量: GitHub issue 远程图透传 github-issue 来源", async () => {
+  const seen: { url: string; source?: ImageSource }[] = [];
+  const images: ImageDownloader = {
+    download: async (url, source) => {
+      seen.push({ url, source });
+      return null;
+    },
+  };
+
+  await runFull({
+    api: fakeGitHubApi([
+      makeIssue({
+        node_id: "I_img",
+        number: 42,
+        labels: [{ name: "published" }],
+        body: '<!-- meta\ndate: 2026-04-01\n-->\n<img src="https://img.example/a.png">',
+      }),
+    ]),
+    fs: memFileStore(),
+    md: fakeMarkdown(),
+    cfg: fixtureConfig(),
+    repo: "owner/repo",
+    templates,
+    manifest,
+    chrome,
+    assetsDir: "assets",
+    feedRenderer: fakeFeedRenderer(),
+    images,
+  });
+
+  expect(seen).toEqual([
+    {
+      url: "https://img.example/a.png",
+      source: { kind: "github-issue", repo: "owner/repo", issueNumber: 42 },
+    },
+  ]);
+});
+
+test("全量: 本地 Markdown 远程图透传 local-markdown 来源", async () => {
+  const seen: { url: string; source?: ImageSource }[] = [];
+  const images: ImageDownloader = {
+    download: async (url, source) => {
+      seen.push({ url, source });
+      return null;
+    },
+  };
+  const localArticle: LocalPost = {
+    issue: makeIssue({
+      node_id: "loc_img",
+      number: 0,
+      labels: [{ name: "published" }],
+      body: '<!-- meta\ndate: 2026-04-01\n-->\n<img src="https://img.example/local.png">',
+    }),
+    fileDir: "/fake/content/posts",
+  };
+
+  await runFull({
+    fs: memFileStore(),
+    md: fakeMarkdown(),
+    cfg: fixtureConfig(),
+    templates,
+    manifest,
+    chrome,
+    assetsDir: "assets",
+    feedRenderer: fakeFeedRenderer(),
+    localPosts: [localArticle],
+    images,
+  });
+
+  expect(seen).toEqual([
+    {
+      url: "https://img.example/local.png",
+      source: { kind: "local-markdown" },
+    },
+  ]);
+});
+
+test("全量: api/repo 必须成对提供", async () => {
+  await expect(
+    runFull({
+      api: fakeGitHubApi([]),
+      fs: memFileStore(),
+      md: fakeMarkdown(),
+      cfg: fixtureConfig(),
+      templates,
+      manifest,
+      chrome,
+      assetsDir: "assets",
+      feedRenderer: fakeFeedRenderer(),
+    }),
+  ).rejects.toThrow("full 策略 api/repo 必须同时提供");
+});
+
+test("全量: 本地图内容变化后引用新文件并回收旧 hash 图片", async () => {
+  const oldBytes = new Uint8Array([1, 1, 1]);
+  const newBytes = new Uint8Array([2, 2, 2]);
+  const cfg = fixtureConfig();
+  const oldName = `${hashLocalImage(oldBytes, "png", cfg.content.webp)}.png`;
+  const localArticle: LocalPost = {
+    issue: makeIssue({
+      node_id: "abc",
+      number: 0,
+      title: "本地文章",
+      labels: [{ name: "published" }],
+      body: '<!-- meta\ndate: 2026-04-01\n-->\n<img src="pic.png">',
+    }),
+    fileDir: "/fake/content/posts",
+  };
+  const fs = memFileStore();
+  fs.writeBytes(`post/abc/${oldName}`, oldBytes);
+  const localImageReader = (_baseDir: string): ImageDownloader => ({
+    download: async (relSrc) =>
+      relSrc === "pic.png"
+        ? { bytes: newBytes, ext: "png", sourceBytes: newBytes, sourceExt: "png" }
+        : null,
+  });
+
+  await runFull({
+    fs,
+    md: fakeMarkdown(),
+    cfg,
+    templates,
+    manifest,
+    chrome,
+    assetsDir: "assets",
+    feedRenderer: fakeFeedRenderer(),
+    localPosts: [localArticle],
+    localImageReader,
+  });
+
+  const newName = `${hashLocalImage(newBytes, "png", cfg.content.webp)}.png`;
+  expect(fs.dump()["post/abc.html"]).toContain(`abc/${newName}`);
+  expect(fs.dumpBytes()[`post/abc/${newName}`]).toEqual(newBytes);
+  expect(fs.dumpBytes()[`post/abc/${oldName}`]).toBeUndefined();
 });
 
 test("离线本地预览: 无 api/repo, 仅由 localPosts 建站", async () => {

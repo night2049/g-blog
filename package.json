@@ -4,9 +4,11 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "bun test",
+    "test": "bun test --path-ignore-patterns \"_github-verify/**\"",
+    "typecheck": "bunx tsc --noEmit",
     "build": "bun scripts/build.ts",
     "build:fixture": "bun scripts/build.ts --fixture",
+    "build:local-preview": "bun scripts/build.ts --local-preview",
     "serve": "bun scripts/serve.ts",
     "preview": "bun scripts/build.ts --fixture && bun scripts/serve.ts",
     "preview:local": "bun scripts/build.ts --local-preview && bun scripts/serve.ts"
@@ -16,6 +18,8 @@
     "@tailwindcss/typography": "^0.5.20",
     "@types/bun": "latest",
     "@types/katex": "^0.16.8",
+    "@types/sanitize-html": "^2.16.1",
+    "happy-dom": "^20.10.6",
     "highlight.js": "^11.11.1",
     "tailwindcss": "^4.3.1"
   },
@@ -27,7 +31,9 @@
     "github-slugger": "^2.0.0",
     "katex": "^0.17.0",
     "medium-zoom": "^1.1.0",
+    "parse5": "^8.0.1",
     "roughjs": "^4.6.6",
+    "sanitize-html": "^2.17.5",
     "sharer.js": "^0.5.4",
     "tocbot": "^4.36.8"
   }

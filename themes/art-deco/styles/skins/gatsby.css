@@ -1,0 +1,91 @@
+/* Art Deco skin: ivory paper, black lacquer, antique gold, emerald accents. */
+
+:root {
+  --gb-font-body: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+  --gb-font-display: "Times New Roman", Georgia, "Songti SC", serif;
+  --gb-font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+
+  --gb-primary: #9a6a18;
+  --gb-on-primary: #fff8e6;
+  --gb-primary-container: #f5df9b;
+  --gb-on-primary-container: #241704;
+  --gb-secondary: #1f4b43;
+  --gb-on-secondary: #fff8e6;
+  --gb-error: #9f2d28;
+  --gb-on-error: #fff8e6;
+  --gb-outline: #b88a35;
+  --gb-outline-variant: #d9bd74;
+
+  --gb-surface: #fbf4df;
+  --gb-surface-dim: #f0e2c2;
+  --gb-surface-bright: #fffaf0;
+  --gb-surface-container-lowest: #fffaf0;
+  --gb-surface-container-low: #fff6e8;
+  --gb-surface-container: #f8ecd2;
+  --gb-surface-container-high: #efe0bd;
+  --gb-surface-container-highest: #dfc786;
+  --gb-on-surface: #17120c;
+  --gb-on-surface-variant: #5e4a2b;
+
+  --gb-shadow-1: 0 2px 0 rgba(154, 106, 24, 0.18);
+  --gb-shadow-2: 0 18px 40px rgba(37, 23, 4, 0.16);
+  --gb-shadow-paper: 0 1px 0 rgba(154, 106, 24, 0.32), 0 18px 50px rgba(37, 23, 4, 0.12);
+  --gb-state-hover: color-mix(in srgb, var(--gb-primary) 13%, transparent);
+  --gb-state-focus: color-mix(in srgb, var(--gb-secondary) 18%, transparent);
+  --gb-state-pressed: color-mix(in srgb, var(--gb-primary) 18%, transparent);
+  --gb-focus-ring: #1f4b43;
+  --gb-zoom-overlay: rgba(23, 18, 12, 0.76);
+
+  --gb-hl-bg: #22170d;
+  --gb-hl-fg: #f8ecd2;
+  --gb-hl-comment: #b79b61;
+  --gb-hl-keyword: #f0c65b;
+  --gb-hl-func: #85c2aa;
+  --gb-hl-string: #f6d895;
+  --gb-hl-number: #8fcbd6;
+  --gb-hl-variable: #e8a95a;
+  --gb-hl-section: #9fd7bd;
+}
+
+.dark {
+  --gb-primary: #e2b64f;
+  --gb-on-primary: #160f08;
+  --gb-primary-container: #6d4711;
+  --gb-on-primary-container: #fff3c6;
+  --gb-secondary: #56b39d;
+  --gb-on-secondary: #071815;
+  --gb-error: #ff9a8f;
+  --gb-on-error: #170909;
+  --gb-outline: #8b6828;
+  --gb-outline-variant: #4d3a19;
+
+  --gb-surface: #090806;
+  --gb-surface-dim: #050403;
+  --gb-surface-bright: #21170d;
+  --gb-surface-container-lowest: #050403;
+  --gb-surface-container-low: #11100d;
+  --gb-surface-container: #18140f;
+  --gb-surface-container-high: #21170d;
+  --gb-surface-container-highest: #33250f;
+  --gb-on-surface: #fbf0d2;
+  --gb-on-surface-variant: #d6bd82;
+
+  --gb-shadow-1: 0 2px 0 rgba(226, 182, 79, 0.12);
+  --gb-shadow-2: 0 18px 44px rgba(0, 0, 0, 0.68);
+  --gb-shadow-paper: 0 0 0 1px rgba(226, 182, 79, 0.18), 0 20px 60px rgba(0, 0, 0, 0.62);
+  --gb-state-hover: color-mix(in srgb, var(--gb-primary) 18%, transparent);
+  --gb-state-focus: color-mix(in srgb, var(--gb-secondary) 24%, transparent);
+  --gb-state-pressed: color-mix(in srgb, var(--gb-primary) 24%, transparent);
+  --gb-focus-ring: #56b39d;
+  --gb-zoom-overlay: rgba(0, 0, 0, 0.9);
+
+  --gb-hl-bg: #120d08;
+  --gb-hl-fg: #f8ecd2;
+  --gb-hl-comment: #a78a52;
+  --gb-hl-keyword: #f0c65b;
+  --gb-hl-func: #9fd7bd;
+  --gb-hl-string: #f6d895;
+  --gb-hl-number: #95d7e2;
+  --gb-hl-variable: #e8a95a;
+  --gb-hl-section: #56b39d;
+}

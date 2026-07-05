@@ -25,6 +25,7 @@ export interface IncrementalDeps {
   fs: FileStore;
   md: Markdown;
   cfg: Config;
+  repo: string;
   templates: TemplateProvider; // 指向所选主题 templates 目录
   manifest: ThemeManifest; // 主题清单
   chrome: ChromeVars; // 构建期派生的外壳片段
@@ -43,6 +44,8 @@ export async function runIncremental(deps: IncrementalDeps): Promise<void> {
     fs,
     md,
     cfg,
+    sourceKind: "github-issue",
+    repo: deps.repo,
     templates,
     manifest,
     chrome,

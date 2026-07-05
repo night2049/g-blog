@@ -9,6 +9,7 @@ import type {
   FileStore,
   Highlighter,
   ImageDownloader,
+  ImageSource,
   Markdown,
   PageDoc,
   PageManifest,
@@ -25,8 +26,7 @@ import { renderPageHtml, renderStandalonePageHtml } from "../domain/template.ts"
 import { finalizeContent, enrichPostContent } from "../domain/finalize.ts";
 import { deletePostPage, writePostPage } from "../domain/siteService.ts";
 
-// 增量单篇所需上下文 (postDir/postPrefix 由调用方预算, 避免每篇重复).
-export interface IncrementalCoreDeps {
+interface IncrementalCoreBaseDeps {
   fs: FileStore;
   md: Markdown;
   cfg: Config;
@@ -38,6 +38,12 @@ export interface IncrementalCoreDeps {
   postDir: string;
   postPrefix: string;
 }
+
+// 增量单篇所需上下文 (postDir/postPrefix 由调用方预算, 避免每篇重复).
+// 来源语义显式建模: GitHub issue 必须有 repo, 本地 md 不能静默降级为 remote.
+export type IncrementalCoreDeps =
+  | (IncrementalCoreBaseDeps & { sourceKind: "github-issue"; repo: string })
+  | (IncrementalCoreBaseDeps & { sourceKind: "local-markdown" });
 
 /**
  * 处理单个 issue 的增量: 删除/关闭 -> 移除; 否则按 pageLabel 分流文章/独立页 (含跨类型迁移).
@@ -57,6 +63,10 @@ export async function applyIncrementalIssue(
 ): Promise<{ pages: PageManifest; changed: boolean }> {
   const { fs, md, cfg, templates, manifest, chrome, highlighter, images, postDir, postPrefix } =
     deps;
+  const imageSource: ImageSource =
+    deps.sourceKind === "local-markdown"
+      ? { kind: "local-markdown" }
+      : { kind: "github-issue", repo: deps.repo, issueNumber: issue.number };
   let changed = false;
   // 旧文章状态: 按 nodeId 在年份分片定位.
   const oldEntry = locateEntry(fs, issue.node_id, postDir)?.entry ?? null;
@@ -70,6 +80,8 @@ export async function applyIncrementalIssue(
       fs,
       imgDir: page.nodeId,
       relPrefix: page.nodeId + "/",
+      imageSource,
+      webp: cfg.content.webp,
     });
     fs.write(
       page.url,
@@ -159,6 +171,8 @@ export async function applyIncrementalIssue(
         fs,
         imgDir: postImgDir(post.nodeId, postDir),
         relPrefix: post.nodeId + "/",
+        imageSource,
+        webp: cfg.content.webp,
       });
       const enriched = enrichPostContent(base.html, cfg.content, postDir + "/");
       post.contentHtml = enriched.html;

@@ -19,7 +19,7 @@ describe("纯操作", () => {
   test("upsert 覆盖同 url", () => {
     const m = upsertEntry([E("a.html", "1", "old")], E("a.html", "2", "new"));
     expect(m.length).toBe(1);
-    expect(m[0].title).toBe("new");
+    expect(m[0]!.title).toBe("new");
   });
   test("sort date 倒序, 同 date url 倒序", () => {
     const sorted = sortManifest([
@@ -76,8 +76,8 @@ describe("pages 清单", () => {
     const input = [P("I_a", "about.html", "旧")];
     const out = upsertPage(input, P("I_a", "about.html", "新"));
     expect(out.length).toBe(1);
-    expect(out[0].title).toBe("新");
-    expect(input[0].title).toBe("旧");
+    expect(out[0]!.title).toBe("新");
+    expect(input[0]!.title).toBe("旧");
   });
   test("removePageByNodeId 移除/不存在原样", () => {
     expect(removePageByNodeId([P("I_a", "about.html")], "I_a")).toEqual([]);

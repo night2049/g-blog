@@ -10,7 +10,7 @@ import {
   pruneOrphanImages,
   cleanThemeAssets,
 } from "../src/domain/siteService.ts";
-import { memFileStore } from "./fakes.ts";
+import { fakeThemeManifest, memFileStore } from "./fakes.ts";
 
 test("writePostPage 写 <postDir>/node_id.html", () => {
   const fs = memFileStore();
@@ -142,22 +142,32 @@ test("pruneOrphanImages: used 覆盖全部 existing 时不删 (无变更复用)"
   expect("post/I_a/a.webp" in fs.dumpBytes()).toBe(true);
 });
 
-test("cleanThemeAssets: 删顶层 js/css, 保 HTML/子目录 json/图片", () => {
+test("cleanThemeAssets: 删顶层主题脚本/样式/静态资产, 保 HTML/子目录 json/图片/白名单", () => {
   const fs = memFileStore({
+    ".nojekyll": "",
+    "CNAME": "blog.example.com",
     "app.css": "x",
     "chrome.js": "x",
     "comic-ink-icon.js": "x",
     "giscus-light.css": "x",
+    "favicon.svg": "x",
+    "logo.png": "x",
+    "font.woff2": "x",
     "index.html": "x",
     "data/tags.json": "[]",
   });
   fs.writeBytes("post/I_a/p.webp", new Uint8Array([1]));
-  cleanThemeAssets(fs);
+  cleanThemeAssets(fs, fakeThemeManifest({ assets: ["giscus-light.css", "favicon.svg"] }));
   const d = fs.dump();
-  expect("app.css" in d).toBe(false);
+  expect("app.css" in d).toBe(true); // app.css 由后续 CSS 编译覆盖, 不按扩展名误删
   expect("chrome.js" in d).toBe(false);
   expect("comic-ink-icon.js" in d).toBe(false);
   expect("giscus-light.css" in d).toBe(false);
+  expect("favicon.svg" in d).toBe(false);
+  expect("logo.png" in d).toBe(true);
+  expect("font.woff2" in d).toBe(true);
+  expect(".nojekyll" in d).toBe(true);
+  expect("CNAME" in d).toBe(true);
   expect("index.html" in d).toBe(true); // HTML 保留 (reassemble 要读正文)
   expect("data/tags.json" in d).toBe(true); // 子目录 json 保留 (增量链)
   expect("post/I_a/p.webp" in fs.dumpBytes()).toBe(true); // 图片保留

@@ -91,15 +91,17 @@ function resolveAsset(r, src) {
   return /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|\/)/.test(src) ? src : r + src;
 }
 
-// 渲染一篇文章卡片 (<li><a>...). url 含 <postDir>/ 前缀, 经 root 解析.
+// 渲染一篇文章卡片 (<li><article>...). url 含 <postDir>/ 前缀, 经 root 解析.
 // 顺序: 标题 → 首图(标题下/正文上) → 摘要(正文) → meta(日期·阅读时长·字数·标签).
 // 派生字段 (cover/summary/readingTime/words) 有则显示无则收起: 老文章无图不留空位.
 function postCard(p) {
   const r = root();
   const li = document.createElement("li");
+  const article = document.createElement("article");
+  article.className = "post-card";
   const a = document.createElement("a");
   a.href = r + p.url;
-  a.className = "post-card";
+  a.className = "post-card-main";
 
   const title = document.createElement("div");
   title.className = "post-card-title";
@@ -149,11 +151,11 @@ function postCard(p) {
     tag.className = "tag tag-link";
     tag.href = r + "tag.html?tag=" + encodeURIComponent(t);
     tag.textContent = "#" + t;
-    tag.addEventListener("click", (e) => e.stopPropagation());
     meta.appendChild(tag);
   }
-  a.appendChild(meta);
-  li.appendChild(a);
+  article.appendChild(a);
+  article.appendChild(meta);
+  li.appendChild(article);
   return li;
 }
 

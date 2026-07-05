@@ -1,0 +1,50 @@
+:root {
+  --color-canvas-default: #fff7f0;
+  --color-canvas-subtle: #ffffff;
+  --color-canvas-overlay: #ffffff;
+  --color-canvas-inset: #f8fbff;
+  --color-fg-default: #17131f;
+  --color-fg-muted: #494052;
+  --color-fg-subtle: #776987;
+  --color-border-default: #17131f;
+  --color-border-muted: #17131f;
+  --color-neutral-muted: #ffe45c;
+  --color-accent-fg: #ff3ea5;
+  --color-accent-emphasis: #ff3ea5;
+  --color-accent-muted: #00a7e1;
+  --color-accent-subtle: #ffe45c;
+  --color-btn-text: #17131f;
+  --color-btn-bg: #ffffff;
+  --color-btn-border: #17131f;
+  --color-btn-hover-bg: #ffe45c;
+  --color-btn-hover-border: #17131f;
+  --color-btn-active-bg: #00d084;
+  --color-btn-primary-text: #ffffff;
+  --color-btn-primary-bg: #ff3ea5;
+  --color-btn-primary-border: #17131f;
+  --color-btn-primary-hover-bg: #00a7e1;
+  --color-btn-primary-disabled-text: #ffffffcc;
+  --color-btn-primary-disabled-bg: #776987;
+  --color-btn-primary-disabled-border: #17131f;
+  --color-success-fg: #00895a;
+  --color-danger-fg: #ff4b3e;
+  --color-prettylights-syntax-comment: #776987;
+  --color-prettylights-syntax-keyword: #ff3ea5;
+  --color-prettylights-syntax-string: #00895a;
+  --color-prettylights-syntax-entity: #7d43dc;
+  --color-prettylights-syntax-constant: #006f9a;
+  --color-prettylights-syntax-variable: #d76700;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+.gsc-comment-box,
+.gsc-comment-box-textarea,
+.gsc-comment-content,
+.btn,
+.gsc-reactions-count,
+.gsc-reaction-button,
+.gsc-reaction,
+.gsc-direct-reaction-button,
+.gsc-social-reaction-summary-item {
+  border-radius: 0 !important;
+  border-width: 2px !important;
+}

@@ -84,6 +84,29 @@ describe("mapToRawIssue", () => {
     expect(issue.created_at).toBe("2025-06-01T00:00:00.000Z");
     expect(issue.updated_at).toBe("2025-06-01T00:00:00.000Z");
   });
+  test("非法 date-only 回退 mtime, 不被 JS 自动滚动", () => {
+    const issue = mapToRawIssue("posts/a.md", { date: "2026-02-31" }, "b", mtime, BUILD, "post");
+    expect(issue.created_at).toBe(mtime.toISOString());
+    expect(issue.updated_at).toBe(mtime.toISOString());
+  });
+  test("非法 ISO datetime 回退 mtime, 不被 JS 自动滚动", () => {
+    const issue = mapToRawIssue(
+      "posts/a.md",
+      { date: "2025-02-29T00:00:00Z" },
+      "b",
+      mtime,
+      BUILD,
+      "post",
+    );
+    expect(issue.created_at).toBe(mtime.toISOString());
+    expect(issue.updated_at).toBe(mtime.toISOString());
+  });
+  test("闰日严格校验", () => {
+    const leap = mapToRawIssue("posts/a.md", { date: "2024-02-29" }, "b", mtime, BUILD, "post");
+    const nonLeap = mapToRawIssue("posts/b.md", { date: "2025-02-29" }, "b", mtime, BUILD, "post");
+    expect(leap.created_at).toBe("2024-02-29T00:00:00.000Z");
+    expect(nonLeap.created_at).toBe(mtime.toISOString());
+  });
   test("date 缺省取 mtime", () => {
     const issue = mapToRawIssue("posts/a.md", {}, "b", mtime, BUILD, "post");
     expect(issue.created_at).toBe(mtime.toISOString());

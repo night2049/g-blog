@@ -1,0 +1,93 @@
+:root {
+  --gb-shape-xs: 0;
+  --gb-shape-sm: 0;
+  --gb-shape-md: 0;
+  --gb-shape-lg: 0;
+  --gb-shape-xl: 0;
+  --gb-shape-full: 2px;
+  --gb-density: 0.92;
+  --gb-measure: 58rem;
+
+  --gb-font-body: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", "Microsoft YaHei", monospace;
+  --gb-font-display: var(--gb-font-body);
+  --gb-font-mono: var(--gb-font-body);
+
+  --gb-primary: #007a3d;
+  --gb-on-primary: #f4fff8;
+  --gb-primary-container: #d8ffe8;
+  --gb-on-primary-container: #002815;
+  --gb-secondary: #526a5b;
+  --gb-on-secondary: #ffffff;
+  --gb-error: #b42318;
+  --gb-on-error: #ffffff;
+  --gb-outline: #8bb99e;
+  --gb-outline-variant: #cfe5d8;
+
+  --gb-surface: #f7fff9;
+  --gb-surface-dim: #e8f5ed;
+  --gb-surface-bright: #ffffff;
+  --gb-surface-container-lowest: #ffffff;
+  --gb-surface-container-low: #f0fbf4;
+  --gb-surface-container: #e8f7ee;
+  --gb-surface-container-high: #dff1e7;
+  --gb-surface-container-highest: #cbe3d5;
+  --gb-on-surface: #0b2115;
+  --gb-on-surface-variant: #466152;
+
+  --gb-shadow-1: 0 0 0 1px color-mix(in srgb, var(--gb-primary) 20%, transparent);
+  --gb-shadow-2: 0 14px 40px rgba(0, 64, 32, 0.14);
+  --gb-shadow-paper: 0 0 0 1px color-mix(in srgb, var(--gb-primary) 28%, transparent),
+    0 12px 34px rgba(0, 64, 32, 0.1);
+  --gb-zoom-overlay: rgba(0, 24, 12, 0.76);
+
+  --gb-hl-bg: #ecfff3;
+  --gb-hl-fg: #082112;
+  --gb-hl-comment: #5a7d68;
+  --gb-hl-keyword: #005f32;
+  --gb-hl-func: #006f4f;
+  --gb-hl-string: #1a6b00;
+  --gb-hl-number: #006c8b;
+  --gb-hl-variable: #8a5200;
+  --gb-hl-section: #007a3d;
+}
+
+.dark {
+  --gb-primary: #39ff88;
+  --gb-on-primary: #001408;
+  --gb-primary-container: #073d21;
+  --gb-on-primary-container: #baffd2;
+  --gb-secondary: #76c995;
+  --gb-on-secondary: #001408;
+  --gb-error: #ff6b6b;
+  --gb-on-error: #140000;
+  --gb-outline: #1c7f45;
+  --gb-outline-variant: #0b4a28;
+
+  --gb-surface: #020704;
+  --gb-surface-dim: #000000;
+  --gb-surface-bright: #092514;
+  --gb-surface-container-lowest: #000000;
+  --gb-surface-container-low: #041109;
+  --gb-surface-container: #061a0e;
+  --gb-surface-container-high: #0a2515;
+  --gb-surface-container-highest: #0f3420;
+  --gb-on-surface: #d4ffe2;
+  --gb-on-surface-variant: #86caa0;
+
+  --gb-shadow-1: 0 0 12px rgba(57, 255, 136, 0.16);
+  --gb-shadow-2: 0 0 34px rgba(57, 255, 136, 0.12);
+  --gb-shadow-paper: 0 0 0 1px color-mix(in srgb, var(--gb-primary) 34%, transparent),
+    0 0 28px rgba(57, 255, 136, 0.1);
+  --gb-zoom-overlay: rgba(0, 0, 0, 0.9);
+
+  --gb-hl-bg: #031309;
+  --gb-hl-fg: #d7ffe6;
+  --gb-hl-comment: #6aa77f;
+  --gb-hl-keyword: #39ff88;
+  --gb-hl-func: #70ffd5;
+  --gb-hl-string: #b7ff64;
+  --gb-hl-number: #73d7ff;
+  --gb-hl-variable: #ffd479;
+  --gb-hl-section: #39ff88;
+}

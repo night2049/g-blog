@@ -12,7 +12,8 @@
 //   - 404: 文件不存在返回 404; 若站点根存在 404.html 则回退返回其内容 (贴近线上 Pages), 状态码仍为 404。
 //   - 安全: 路径经 decodeURIComponent 后做越界判定, 解析结果必须仍在 root 内 (防 ".." 越界与绝对路径逃逸),
 //           越界返回 400。
-import { join, resolve, sep } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { resolve, relative, isAbsolute, dirname } from "node:path";
 
 const DEFAULT_ROOT = "_preview";
 const DEFAULT_PORT = 3000;
@@ -29,6 +30,7 @@ export function resolvePreviewPath(root: string, urlPath: string): string | null
     return null; // 非法百分号编码 (如孤立的 "%")
   }
   if (decoded.includes("\0")) return null; // 拒绝空字节注入
+  if (decoded.includes("\\")) return null; // Windows 路径分隔符不应出现在 URL path
 
   // 目录请求 ("/" 或以 "/" 结尾) 映射到该目录下的 index.html。
   let rel = decoded;
@@ -41,10 +43,32 @@ export function resolvePreviewPath(root: string, urlPath: string): string | null
   const rootResolved = resolve(root);
   const targetResolved = resolve(rootResolved, relClean);
   // 越界判定: 目标必须等于 root 自身或位于 root 子树内 (拼 sep 防 "_previewX" 这类前缀误判)。
-  if (targetResolved !== rootResolved && !targetResolved.startsWith(rootResolved + sep)) {
-    return null;
+  if (!within(rootResolved, targetResolved)) return null;
+  if (!existsSync(rootResolved)) return targetResolved;
+
+  const realRoot = realpathSync(rootResolved);
+  if (existsSync(targetResolved)) {
+    if (!within(realRoot, realpathSync(targetResolved))) return null;
+  } else {
+    const parent = nearestExisting(dirname(targetResolved));
+    if (existsSync(parent) && !within(realRoot, realpathSync(parent))) return null;
   }
   return targetResolved;
+}
+
+function within(root: string, target: string): boolean {
+  const rel = relative(root, target);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+function nearestExisting(path: string): string {
+  let cur = path;
+  while (!existsSync(cur)) {
+    const next = dirname(cur);
+    if (next === cur) return cur;
+    cur = next;
+  }
+  return cur;
 }
 
 // 解析命令行与环境变量, 得到 root 与 port。CLI 覆盖环境变量, 环境变量覆盖默认值。
@@ -83,8 +107,9 @@ function startServer(argv: string[]): void {
         return new Response(file);
       }
       // 回退到站点根 404.html (若存在), 贴近线上 Pages 行为; 状态码仍为 404。
-      const notFound = Bun.file(join(rootResolved, "404.html"));
-      if (await notFound.exists()) {
+      const notFoundPath = resolvePreviewPath(rootResolved, "/404.html");
+      const notFound = notFoundPath ? Bun.file(notFoundPath) : null;
+      if (notFound && (await notFound.exists())) {
         console.log("[serve] 404 (回退 404.html) -> " + pathname);
         return new Response(notFound, { status: 404 });
       }

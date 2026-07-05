@@ -4,12 +4,6 @@ on:
     types: [opened, edited, closed, reopened, deleted, labeled, unlabeled]
   push:
     branches: [main]
-    paths:
-      - "content/**"
-      - "themes/**"
-      - "config/**"
-      - "src/**"
-      - "scripts/**"
   workflow_dispatch:
     inputs:
       full:

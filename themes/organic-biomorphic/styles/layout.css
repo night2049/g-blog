@@ -1,0 +1,1207 @@
+/* 结构性 CSS: 只消费 --gb-* 令牌, 不硬编码颜色/间距. 语义类供模板与客户端脚本引用.
+   含: 外壳 (header/nav/footer/logo/主题钮)、卡片列表、文章页、代码块/.hljs-*、
+   prose 令牌绑定、响应式断点、占位部件默认隐藏. 换肤只改皮肤令牌, 此文件不动. */
+
+@layer base {
+  html {
+    /* 移动端避免标题字号被自动放大 */
+    -webkit-text-size-adjust: 100%;
+    /* 始终预留滚动条宽度: 内容高度跨越视口(如 giscus 迟到加载)时滚动条出现/消失
+       不再改变可用宽度, 居中栏不会左右抖动, 切页/加载更顺滑. */
+    scrollbar-gutter: stable;
+  }
+  body {
+    margin: 0;
+    background: var(--gb-surface);
+    color: var(--gb-on-surface);
+    font-family: var(--gb-font-body);
+    font-size: var(--gb-text-body);
+    line-height: 1.6;
+  }
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--gb-font-mono);
+  }
+  /* 可见焦点环 (键盘可达性), 取主色; 遵循 reduce-motion 在过渡处理 */
+  :focus-visible {
+    outline: 2px solid var(--gb-focus-ring);
+    outline-offset: 2px;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@layer components {
+  /* ---- 容器: 阅读栏居中, 左右 gutter 随屏宽 ---- */
+  .page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin-inline: auto;
+    max-width: var(--gb-measure);
+    padding-inline: var(--gb-gutter);
+    padding-block: var(--gb-space-6);
+  }
+
+  /* ---- 顶栏 / 导航: 吸顶; 滚动后变"浮动大圆角卡片"(同正文纸张语言) ---- */
+  .site-header {
+    position: sticky;
+    top: var(--gb-space-3);
+    z-index: var(--gb-z-sticky);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gb-space-3);
+    margin-bottom: var(--gb-space-6);
+    padding-block: var(--gb-space-3);
+    padding-inline: var(--gb-space-4);
+    background: var(--gb-surface);
+    border: 1px solid transparent;
+    border-bottom-color: var(--gb-outline-variant); /* 置顶时仅一条底边分隔 */
+    transition: transform 0.3s ease, border-radius 0.25s ease,
+      box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  /* 滚动后: 四边描边 + 大圆角 + 极淡投影, 浮动卡片 */
+  .site-header.is-scrolled {
+    border-color: var(--gb-outline-variant);
+    border-radius: var(--gb-shape-xl);
+    box-shadow: var(--gb-shadow-paper);
+  }
+  /* 移动端下滚时隐藏顶栏(由脚本切换 is-hidden); 桌面端脚本始终移除该类, 保持常驻吸顶. */
+  .site-header.is-hidden {
+    transform: translateY(-100%);
+  }
+  .site-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gb-space-2);
+    font-size: var(--gb-text-title);
+    font-weight: 700;
+  }
+  .site-logo-link {
+    color: var(--gb-primary);
+    text-decoration: none;
+  }
+  .site-logo-img {
+    display: block;
+    height: 28px;
+    width: auto;
+  }
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gb-space-1);
+    font-size: var(--gb-text-label);
+    /* 让导航在中间弹性占位, 主题钮始终靠右 */
+    flex: 1 1 auto;
+    justify-content: flex-end;
+  }
+  .site-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px; /* 触屏命中区 >=44px */
+    padding-inline: var(--gb-space-3);
+    border-radius: var(--gb-shape-full);
+    color: var(--gb-on-surface-variant);
+    text-decoration: none;
+  }
+  .site-nav a[aria-current="page"] {
+    color: var(--gb-primary);
+    font-weight: 600;
+  }
+  .site-nav .nav-external::after {
+    content: "↗";
+    margin-left: 2px;
+    font-size: 0.85em;
+    opacity: 0.7;
+  }
+
+  /* ---- 顶栏图标按钮 (主题切换 / RSS): 去外壳 (无边框/无底色), 图标放大至接近原 44px 外壳尺寸;
+     保留 44px 命中区与对齐. 主题钮图标由脚本按当前态切换 (☀/☾/◐). ---- */
+  .theme-toggle,
+  .rss-toggle,
+  .nav-toggle {
+    display: inline-flex;
+    height: 44px;
+    width: 44px;
+    flex: 0 0 auto;
+    padding: 0;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--gb-primary);
+    line-height: 1;
+    transition: color 0.2s ease;
+  }
+  .theme-toggle {
+    font-size: 1.75rem; /* 字形主题钮: 放大到接近原外壳直径 */
+  }
+  /* 主题钮图标: 由 CSS ::before 按 <html data-theme> 渲染 (data-theme 由 head 脚本于首帧前设定),
+     图标首帧即正确, 不再由 JS 改 textContent -> 消除进入/刷新时的图标切换与抖动. 无 JS 时回退 ◐ (跟随系统). */
+  .theme-toggle::before {
+    content: "\25d0";
+  }
+  html[data-theme="light"] .theme-toggle::before {
+    content: "\2600"; /* ☀ */
+  }
+  html[data-theme="dark"] .theme-toggle::before {
+    content: "\263e"; /* ☾ */
+  }
+  /* 无外壳: 悬停/聚焦/展开用颜色加深做反馈 */
+  .theme-toggle:hover,
+  .rss-toggle:hover,
+  .nav-toggle:hover,
+  .rss-toggle[aria-expanded="true"],
+  .nav-toggle[aria-expanded="true"] {
+    color: color-mix(in srgb, var(--gb-primary) 78%, var(--gb-on-surface));
+  }
+
+  /* ---- RSS 下拉: 触发按钮 + 展开的订阅链接面板 ---- */
+  /* 顶栏动作区: RSS + 主题钮成组, margin-left:auto 始终靠右 (含窄屏换行后),
+     使 RSS 永远紧邻主题钮左侧, 且 .rss-panel(right:0) 锚在 RSS 右缘向左展开不溢出视口. */
+  .header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gb-space-3);
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+  .rss-menu {
+    position: relative; /* 面板绝对定位锚点 */
+    flex: 0 0 auto;
+    display: inline-flex;
+  }
+  .rss-panel {
+    position: absolute;
+    top: calc(100% + var(--gb-space-2));
+    right: 0; /* 贴按钮右缘向左展开, 不溢出视口 */
+    z-index: var(--gb-z-overlay);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 9rem;
+    padding: var(--gb-space-2);
+    background: var(--gb-surface);
+    border: 1px solid var(--gb-outline-variant);
+    border-radius: var(--gb-shape-md);
+    box-shadow: var(--gb-shadow-2);
+  }
+  .rss-panel[hidden] {
+    display: none; /* 覆盖上面的 display:flex, 实现折叠 */
+  }
+  /* 注入片段的 <a> 无类, 用后代选择器着色 (满足 chrome.json 片段不被 Tailwind 扫描的约束) */
+  .rss-panel a {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 var(--gb-space-3);
+    border-radius: var(--gb-shape-sm);
+    color: var(--gb-on-surface-variant);
+    text-decoration: none;
+    font-size: var(--gb-text-label);
+  }
+  .rss-panel a:hover {
+    background: var(--gb-state-hover);
+    color: var(--gb-primary);
+  }
+  /* rss 关闭或 formats 空 -> #rss-links 注入为空 -> 整组隐藏 (并消除注入前空控件闪现) */
+  .rss-menu:has(#rss-links:empty) {
+    display: none;
+  }
+
+  /* ---- 文章列表 (卡片): 整卡可点, 卡间留白, 无分割线 ---- */
+  .post-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gb-space-4);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .post-card {
+    display: block;
+    padding: calc(var(--gb-space-5) * var(--gb-density));
+    border: 1px solid var(--gb-outline-variant);
+    border-radius: var(--gb-shape-lg);
+    background: var(--gb-surface-container-low);
+  }
+  .post-card-main {
+    display: block;
+    text-decoration: none;
+  }
+  .post-card-title {
+    font-size: var(--gb-text-title);
+    font-weight: 600;
+    color: var(--gb-on-surface);
+  }
+  /* 日期 + 标签同一行 */
+  .post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gb-space-2);
+    margin-top: var(--gb-space-2);
+    font-size: var(--gb-text-label);
+    color: var(--gb-on-surface-variant);
+  }
+  .post-card-date {
+    color: var(--gb-on-surface-variant);
+  }
+
+  /* ---- 标签: 极简纯文本(无外圈/无填充), 次要文字色 ---- */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    color: var(--gb-on-surface-variant);
+    font-size: var(--gb-text-label);
+  }
+  .tag-link {
+    text-decoration: none;
+  }
+
+  /* ---- 分页 / 空态 ---- */
+  .pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gb-space-4);
+    margin-top: var(--gb-space-7);
+    font-size: var(--gb-text-label);
+    color: var(--gb-on-surface-variant);
+  }
+  .pager a {
+    color: var(--gb-primary);
+    text-decoration: none;
+  }
+  .pager a:hover {
+    text-decoration: underline;
+  }
+  .pager .disabled {
+    color: var(--gb-on-surface-variant);
+    opacity: 0.5;
+  }
+  .empty {
+    margin-top: var(--gb-space-7);
+    text-align: center;
+    font-size: var(--gb-text-label);
+    color: var(--gb-on-surface-variant);
+  }
+
+  /* ---- 文章页: 正文容器为一张"纸"(描边 + 极淡投影体现, 背景与页面同色不改) ----
+     浅色纯白 #fff / 深色纯黑 #000, 仅靠 hairline 描边 (+浅色极淡投影) 勾出纸的边界. */
+  .post-article {
+    margin-top: var(--gb-space-5);
+    padding: var(--gb-space-7) var(--gb-space-6);
+    background: var(--gb-surface);
+    border: 1px solid var(--gb-outline-variant);
+    border-radius: var(--gb-shape-xl);
+    box-shadow: var(--gb-shadow-paper);
+  }
+  /* 评论区: 与正文同款"纸"; giscus 运行时注入 .giscus 容器 */
+  .giscus {
+    margin-top: var(--gb-space-5);
+    padding: var(--gb-space-6);
+    background: var(--gb-surface);
+    border: 1px solid var(--gb-outline-variant);
+    border-radius: var(--gb-shape-xl);
+    box-shadow: var(--gb-shadow-paper);
+  }
+  /* 暗色纯黑上投影不可见, 去掉; 靠描边勾边 */
+  .dark .post-article,
+  .dark .giscus,
+  .dark .site-header.is-scrolled {
+    box-shadow: none;
+  }
+  .post-title {
+    font-size: var(--gb-text-display);
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--gb-on-surface);
+  }
+  .post-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gb-space-2);
+    margin-top: var(--gb-space-3);
+    font-size: var(--gb-text-label);
+    color: var(--gb-on-surface-variant);
+  }
+
+  /* ---- 年度归档年份导航 ---- */
+  .year-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gb-space-2);
+    margin: var(--gb-space-4) 0 var(--gb-space-6);
+  }
+  /* 年份标签: 与文章标签同一极简风格(纯文本 + 同色下划线), 当前年用主色 */
+  .year-link {
+    color: var(--gb-on-surface-variant);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-size: var(--gb-text-label);
+  }
+  .year-link.active {
+    color: var(--gb-primary);
+    font-weight: 600;
+  }
+
+  /* ---- 目录 map ---- */
+  .dir-map {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gb-space-3);
+    margin-top: var(--gb-space-5);
+  }
+  .dir-map-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--gb-space-4);
+    border: 1px solid var(--gb-outline-variant);
+    border-radius: var(--gb-shape-lg);
+    background: var(--gb-surface-container-low);
+    color: var(--gb-on-surface);
+    text-decoration: none;
+  }
+  .dir-count {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--gb-space-2);
+    border: 1px solid var(--gb-outline-variant);
+    border-radius: var(--gb-shape-full);
+    color: var(--gb-on-surface-variant);
+    font-size: var(--gb-text-label);
+  }
+  .back-link {
+    display: inline-block;
+    margin-bottom: var(--gb-space-3);
+    color: var(--gb-primary);
+    text-decoration: none;
+    font-size: var(--gb-text-label);
+  }
+
+  /* ---- 页脚: 单行居中(窄屏自动换行), 经 margin-top:auto 始终贴页面底部 ---- */
+  /* 分隔线/留白挂在 .footer-line(而非 .site-footer): 外壳注入前 .footer-line:empty 隐藏, 连同分隔线一并消失, 杜绝空分隔线闪现. */
+  .site-footer {
+    margin-top: auto;
+    color: var(--gb-on-surface-variant);
+    font-size: var(--gb-text-label);
+    line-height: 1.8;
+  }
+  .site-footer a {
+    color: var(--gb-on-surface-variant);
+    text-decoration: none;
+  }
+  .site-footer a:hover {
+    color: var(--gb-primary);
+    text-decoration: underline;
+  }
+  .footer-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gb-space-3);
+    padding-top: var(--gb-space-6);
+    border-top: 1px solid var(--gb-outline-variant);
+  }
+  .footer-beian {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+/* ---- 正文 prose: 把 typography 的 --tw-prose-* 全量绑定到 --gb-* ----
+   置于 layer 外, 优先级高于 @plugin typography 的分层默认值; 模板正文只用 .prose
+   (去掉 dark:prose-invert), 因 --gb-* 已随 .dark 翻转, var() 在用时重解析自动跟随明暗. */
+.prose {
+  --tw-prose-body: var(--gb-on-surface);
+  --tw-prose-headings: var(--gb-on-surface);
+  --tw-prose-lead: var(--gb-on-surface-variant);
+  --tw-prose-links: var(--gb-primary);
+  --tw-prose-bold: var(--gb-on-surface);
+  --tw-prose-counters: var(--gb-on-surface-variant);
+  --tw-prose-bullets: var(--gb-outline);
+  --tw-prose-hr: var(--gb-outline-variant);
+  --tw-prose-quotes: var(--gb-on-surface-variant);
+  --tw-prose-quote-borders: var(--gb-outline-variant);
+  --tw-prose-captions: var(--gb-on-surface-variant);
+  --tw-prose-kbd: var(--gb-on-surface);
+  --tw-prose-kbd-shadows: 15 23 42;
+  --tw-prose-code: var(--gb-on-surface);
+  --tw-prose-pre-code: var(--gb-hl-fg);
+  --tw-prose-pre-bg: var(--gb-hl-bg);
+  --tw-prose-th-borders: var(--gb-outline-variant);
+  --tw-prose-td-borders: var(--gb-outline-variant);
+  max-width: none;
+  font-size: var(--gb-text-body);
+  line-height: 1.75;
+  color: var(--gb-on-surface);
+}
+/* h2/h3 留锚点间距 */
+.prose :where(h2, h3):not(:first-child) {
+  margin-top: var(--gb-space-6);
+}
+/* prose 表格横向滚动 (移动端溢出处理) */
+.prose :where(table) {
+  display: block;
+  overflow-x: auto;
+}
+
+/* ---- 代码块: 放 layer 外, 优先级高于 prose 的 pre (其默认深底会破坏浅色模式) ----
+   底色取 --gb-hl-bg, 圆角 12px, 1px 描边; overflow-x 处理移动端长行. */
+.post-article pre {
+  background: var(--gb-hl-bg);
+  border: 1px solid var(--gb-outline-variant);
+  border-radius: var(--gb-shape-md);
+  padding: 0;
+  overflow: hidden;
+}
+.post-article pre code {
+  display: block;
+  overflow-x: auto;
+  padding: var(--gb-space-4);
+  font-size: 0.875rem;
+  background: transparent;
+  color: var(--gb-hl-fg);
+}
+
+/* highlight.js token 着色: 颜色取 --gb-hl-* 变量, 随 .dark 自动切换 (github / github-dark) */
+.hljs-comment,
+.hljs-quote {
+  color: var(--gb-hl-comment);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-meta .hljs-keyword {
+  color: var(--gb-hl-keyword);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-name {
+  color: var(--gb-hl-func);
+}
+.hljs-section {
+  color: var(--gb-hl-section);
+  font-weight: 700;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-meta .hljs-string {
+  color: var(--gb-hl-string);
+}
+.hljs-number,
+.hljs-built_in,
+.hljs-type,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: var(--gb-hl-number);
+}
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-attribute,
+.hljs-tag {
+  color: var(--gb-hl-variable);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 700;
+}
+.hljs-deletion {
+  color: var(--gb-hl-keyword);
+}
+
+/* 注: 部件 (post-toc / reading-progress / 操作簇 / 代码复制 / 灯箱 / 公式 / 卡片首图 / 标签云 / 错误页)
+   的真实结构与响应式规则见文件末尾"功能增强部件"区块 (本轮实现, 不再默认隐藏). */
+
+/* 共用列表骨架的挂载点超集: 未填充的容器经 :empty 隐藏, 不产生视觉 (留白/边框/margin). */
+#page-title:empty,
+.year-nav:empty,
+.dir-map:empty,
+.site-footer .footer-line:empty {
+  display: none;
+}
+
+/* ---- 响应式: 宽屏放宽 gutter; 窄屏收窄正文纸张内边距; 关闭动效遵循 prefers-reduced-motion ---- */
+@media (min-width: 768px) {
+  :root {
+    --gb-gutter: 24px;
+  }
+}
+@media (max-width: 767px) {
+  .post-article,
+  .giscus {
+    padding: var(--gb-space-5) var(--gb-space-4);
+    border-radius: var(--gb-shape-lg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ===================================================================
+   功能增强部件 (本轮): 目录 TOC / 阅读进度 / 操作簇 FAB / 代码复制 /
+   图片灯箱 / 数学公式 / 卡片首图+摘要 / 标签云 / 错误页.
+   只消费 --gb-* 令牌, 不硬编码; 移动优先, 桌面经 media query 增强.
+   置于 layer 外, 优先级高于 prose/typography 默认值, 不破坏正文令牌绑定.
+   =================================================================== */
+
+/* ---- 文章目录 TOC: tocbot 挂载于 <post-toc> (置于正文标题区与正文之间) ----
+   移动优先: 正文内一张描边卡片, 自身可滚 (max-height + overflow); 桌面(≥1280px)拉到
+   正文左侧留白吸顶 (fixed = 随滚动常驻). 无标题时 :empty 隐藏 (tocbot 未填充/widgets.js 兜底移除). */
+/* 移动优先 (<1280px): 默认隐藏的右下浮层 sheet, 由目录 FAB 切 .is-open 弹出 (点条目/外部收起). */
+post-toc {
+  position: fixed;
+  right: var(--gb-space-4);
+  bottom: calc(var(--gb-space-7) + env(safe-area-inset-bottom, 0px));
+  z-index: var(--gb-z-overlay);
+  width: min(20rem, calc(100vw - 2 * var(--gb-gutter)));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--gb-space-2) var(--gb-space-3);
+  border: 1px solid var(--gb-outline-variant);
+  border-radius: var(--gb-shape-lg);
+  background: var(--gb-surface);
+  box-shadow: var(--gb-shadow-2);
+  font-size: var(--gb-text-label);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(var(--gb-space-3));
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+}
+post-toc.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+post-toc:empty {
+  display: none;
+}
+/* 目录标题/开关: 移动作 sheet 标题; PC 折叠态 (.few-entries) 作可点开关. */
+.toc-head {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--gb-space-1);
+  padding: var(--gb-space-1) var(--gb-space-2);
+  border: none;
+  background: transparent;
+  color: var(--gb-on-surface);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+post-toc .toc-list {
+  list-style: none;
+  margin: 0;
+  padding-left: var(--gb-space-3);
+}
+post-toc > .toc-list {
+  padding-left: 0;
+}
+post-toc .toc-list-item {
+  margin: 1px 0;
+}
+post-toc .toc-link {
+  display: block;
+  min-height: 32px; /* 触屏命中区 (TOC 项目偏密, 不强求 44 但保持可点) */
+  padding: var(--gb-space-1) var(--gb-space-2);
+  border-radius: var(--gb-shape-sm);
+  color: var(--gb-on-surface-variant);
+  text-decoration: none;
+  line-height: 1.5;
+  overflow-wrap: anywhere; /* 长标题不横向溢出 */
+}
+post-toc .toc-link:hover {
+  background: var(--gb-state-hover);
+  color: var(--gb-primary);
+}
+post-toc .toc-link.is-active-link {
+  color: var(--gb-primary);
+  font-weight: 600;
+}
+@media (min-width: 1280px) {
+  /* 桌面: 目录吸顶贴正文左侧留白; 取消移动浮层态 (常驻可见, 描边卡片而非浮层). */
+  post-toc {
+    position: fixed;
+    top: 6.5rem;
+    bottom: auto;
+    left: calc(50% - var(--gb-measure) / 2 - var(--gb-toc-width) - var(--gb-space-5));
+    right: auto;
+    width: var(--gb-toc-width);
+    margin: 0;
+    max-height: calc(100vh - 9rem);
+    z-index: var(--gb-z-sticky);
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    background: var(--gb-surface-container-low);
+    box-shadow: none;
+  }
+  /* 条目充足: 常驻展开, .toc-head 作静态标题 (不可点). */
+  post-toc:not(.few-entries) .toc-head {
+    cursor: default;
+  }
+  /* 条目少 (.few-entries): 折叠为"目录"开关, 列表默认隐藏, .is-open 展开. */
+  post-toc.few-entries:not(.is-open) .toc-list {
+    display: none;
+  }
+  post-toc.few-entries .toc-head::after {
+    content: "▸";
+    margin-left: var(--gb-space-2);
+    font-size: 0.85em;
+    color: var(--gb-on-surface-variant);
+  }
+  post-toc.few-entries.is-open .toc-head::after {
+    content: "▾";
+  }
+}
+
+/* ---- 阅读进度: 视口顶部细线, 宽度随滚动比例由脚本设 (信息反馈, reduce-motion 下仍更新宽度) ---- */
+reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--gb-z-overlay);
+  display: block;
+  height: 3px;
+  width: 0; /* 由 widgets.js 按滚动比例设 style.width */
+  background: var(--gb-primary);
+  transition: width 0.1s linear;
+  pointer-events: none;
+}
+
+/* ---- 操作簇: 右下角悬浮按钮栈 (回首页 / 分享 / 回顶部) ----
+   由 widgets.js 建 .fab-cluster 容器并填入 .fab 按钮; 滚动超阈值加 .is-visible 浮现.
+   避让底部安全区 (env safe-area). 命中区 44px. */
+.fab-cluster {
+  position: fixed;
+  right: var(--gb-space-4);
+  bottom: calc(var(--gb-space-4) + env(safe-area-inset-bottom, 0px));
+  z-index: var(--gb-z-fab);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gb-space-2);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+}
+.fab-cluster.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+.fab-cluster .fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  width: 44px;
+  padding: 0;
+  /* 去壳: 与页头 .theme-toggle/.rss-toggle 同款 (透明无边框无阴影, 主色图标, hover 加深) */
+  border: none;
+  background: transparent;
+  color: var(--gb-primary);
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+.fab-cluster .fab:hover {
+  color: color-mix(in srgb, var(--gb-primary) 78%, var(--gb-on-surface));
+}
+.fab-cluster .fab svg {
+  width: 28px; /* 与页头 RSS 按钮 svg (28x28) 一致, 视觉等大 */
+  height: 28px;
+  fill: currentColor;
+}
+@media (min-width: 1280px) {
+  /* 桌面: 操作簇贴正文右侧, 距正文约 12px (镜像左侧 TOC 但更贴正文); 不贴视口右缘/滚动条. */
+  .fab-cluster {
+    right: calc(50% - var(--gb-measure) / 2 - 32px);
+  }
+  /* 桌面用左栏目录, 不要目录 FAB */
+  .fab-cluster .fab-toc {
+    display: none;
+  }
+}
+/* 分享渠道弹层 (桌面: 点分享钮弹出各渠道; 移动优先走 navigator.share) */
+.share-menu {
+  position: absolute;
+  right: 52px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 8rem;
+  padding: var(--gb-space-2);
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-outline-variant);
+  border-radius: var(--gb-shape-md);
+  box-shadow: var(--gb-shadow-2);
+}
+.share-menu[hidden] {
+  display: none;
+}
+.share-menu button {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--gb-space-3);
+  border: none;
+  border-radius: var(--gb-shape-sm);
+  background: transparent;
+  color: var(--gb-on-surface-variant);
+  font-size: var(--gb-text-label);
+  text-align: left;
+  cursor: pointer;
+}
+.share-menu button:hover {
+  background: var(--gb-state-hover);
+  color: var(--gb-primary);
+}
+
+/* ---- 代码复制: 每个代码块右上角幽灵按钮, 移入/聚焦显现; 成功态主色 ---- */
+.post-article pre {
+  position: relative; /* 复制钮绝对定位锚点 */
+}
+.code-copy {
+  position: absolute;
+  top: var(--gb-space-2);
+  right: var(--gb-space-2);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px var(--gb-space-2);
+  border: 1px solid var(--gb-outline-variant);
+  border-radius: var(--gb-shape-sm);
+  background: var(--gb-surface-container-high);
+  color: var(--gb-on-surface-variant);
+  font-size: var(--gb-text-label);
+  font-family: var(--gb-font-body);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+.post-article pre:hover .code-copy,
+.code-copy:focus-visible {
+  opacity: 1;
+}
+.code-copy.is-copied {
+  color: var(--gb-primary);
+  opacity: 1;
+}
+
+/* ---- 图片灯箱 (medium-zoom): 遮罩取 --gb-zoom-overlay 令牌; 层级高于页头/进度/FAB ---- */
+/* medium-zoom 不自带 z-index(未引入其 style.css), 默认 auto 会被显式 z-index 的吸顶部件(页头100/进度1000/FAB1100)压过 -> 灯箱下它们"亮起来". 显式抬到 toast 层(1200)之上. */
+.medium-zoom-overlay {
+  z-index: var(--gb-z-toast) !important;
+  background: var(--gb-zoom-overlay) !important;
+}
+.medium-zoom--opened .medium-zoom-overlay {
+  background: var(--gb-zoom-overlay) !important;
+}
+.medium-zoom-image--opened {
+  z-index: calc(var(--gb-z-toast) + 1) !important; /* 放大图浮于遮罩之上 */
+}
+/* 可点放大的图: 提示性指针 */
+.prose img[data-zoomable] {
+  cursor: zoom-in;
+}
+
+/* ---- 数学公式 (KaTeX): 块级独占一行居中且过宽时横向滚动, 不撑破正文; 行内随正文基线 ---- */
+.katex-display {
+  margin: var(--gb-space-5) 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: var(--gb-space-1); /* 滚动条不压公式 */
+}
+.katex {
+  /* 颜色随正文翻转 (KaTeX 多数用 currentColor); 行内不放大避免打断行高 */
+  font-size: 1em;
+}
+
+/* ---- 列表卡片增强: 首图缩略 + 摘要 (有则显示无则收起, 不破坏紧凑形态) ---- */
+.post-card-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: var(--gb-space-3);
+  border-radius: var(--gb-shape-md);
+  object-fit: cover; /* 等比裁切, 固定宽高比 */
+  background: var(--gb-surface-container-high);
+}
+.post-card-summary {
+  margin-top: var(--gb-space-2);
+  color: var(--gb-on-surface-variant);
+  font-size: var(--gb-text-label);
+  line-height: 1.6;
+  /* 超出两行省略 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---- 标签聚合页 (标签云): chip 字号随频次由脚本设 inline; 居中流式换行 ---- */
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--gb-space-3);
+  margin: var(--gb-space-6) 0;
+}
+.tag-cloud-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* 对齐站内 .tag: 极简纯文本, 无描边/无填充; 仅留小内边距作命中区. 全部统一字号 (不按频次缩放). */
+  padding: var(--gb-space-1) var(--gb-space-2);
+  color: var(--gb-on-surface-variant);
+  text-decoration: none;
+  line-height: 1.3;
+  font-size: var(--gb-text-body);
+}
+.tag-cloud-item:hover {
+  color: var(--gb-primary);
+}
+.tag-cloud-count {
+  color: var(--gb-on-surface-variant);
+  font-size: var(--gb-text-label);
+  opacity: 0.7;
+}
+
+/* ---- 错误页: 居中超大弱化码字 (背景质感) + 简短说明 + 返回首页 ---- */
+.error-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gb-space-4);
+  flex: 1 1 auto;
+  padding: var(--gb-space-8) 0;
+  text-align: center;
+}
+.error-code {
+  font-size: var(--gb-error-code-size);
+  font-weight: 800;
+  line-height: 1;
+  /* 极淡描边色, 作背景质感而非主角 */
+  color: var(--gb-outline-variant);
+  letter-spacing: 0.02em;
+}
+.error-message {
+  font-size: var(--gb-text-headline);
+  color: var(--gb-on-surface);
+}
+.error-desc {
+  color: var(--gb-on-surface-variant);
+  font-size: var(--gb-text-body);
+}
+.error-home {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: var(--gb-space-3);
+  padding: 0 var(--gb-space-5);
+  border-radius: var(--gb-shape-full);
+  background: var(--gb-primary);
+  color: var(--gb-on-primary);
+  text-decoration: none;
+  font-size: var(--gb-text-label);
+}
+
+/* 窄屏: 操作簇与代码复制按钮的触屏适配 (复制钮在触屏 hover 不可靠 -> 常显) */
+@media (max-width: 767px) {
+  .code-copy {
+    opacity: 0.7; /* 触屏无 hover, 常显淡按钮 */
+  }
+}
+
+/* ---- 标题锚点: 构建期注入 id + hover 显现的 # 锚链 (github-slugger 生成 slug) ----
+   锚链文本为空, # 由 ::before 渲染, 使标题 textContent 不含 # (不污染 tocbot 目录与摘要). */
+.prose :where(h1, h2, h3, h4, h5, h6) .heading-anchor {
+  opacity: 0;
+  margin-left: 0.3em;
+  color: var(--gb-on-surface-variant);
+  text-decoration: none;
+  font-weight: 400;
+  transition: opacity 0.2s ease;
+}
+.prose :where(h1, h2, h3, h4, h5, h6) .heading-anchor::before {
+  content: "#";
+}
+.prose :where(h1, h2, h3, h4, h5, h6):hover .heading-anchor,
+.heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+/* ---- giscus 加载失败兜底链接 (widgets.js 在 client.js onerror 时注入): 与评论"纸"同款描边卡片 ---- */
+.giscus-fallback {
+  display: block;
+  margin-top: var(--gb-space-5);
+  padding: var(--gb-space-5);
+  border: 1px solid var(--gb-outline-variant);
+  border-radius: var(--gb-shape-lg);
+  background: var(--gb-surface-container-low);
+  color: var(--gb-on-surface-variant);
+  text-decoration: none;
+  text-align: center;
+  font-size: var(--gb-text-label);
+}
+.giscus-fallback:hover {
+  color: var(--gb-primary);
+}
+
+/* ---- 顶栏导航移动端折叠 (方案A): <768px 折叠为下拉, >=768px 内联 ----
+   置于 @layer 外, 优先级高于 components 层的 .site-nav/.nav-toggle 基样式, 确保覆盖. */
+@media (max-width: 767px) {
+  /* 导航收进下拉面板 (复用 rss-panel 风格), 由 #nav-toggle 切 .is-open; 顶栏回到单行. */
+  .site-nav {
+    position: absolute;
+    top: calc(100% + var(--gb-space-2));
+    left: var(--gb-space-3);
+    right: var(--gb-space-3);
+    z-index: var(--gb-z-overlay);
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    flex: 0 0 auto;
+    padding: var(--gb-space-2);
+    background: var(--gb-surface);
+    border: 1px solid var(--gb-outline-variant);
+    border-radius: var(--gb-shape-md);
+    box-shadow: var(--gb-shadow-2);
+  }
+  .site-nav.is-open {
+    display: flex;
+  }
+  .site-nav a {
+    justify-content: flex-start;
+  }
+}
+@media (min-width: 768px) {
+  /* 桌面: 隐藏菜单钮, 导航内联 (沿用 @layer 基样式) */
+  .nav-toggle {
+    display: none;
+  }
+}
+
+/* ===================================================================
+   Organic Biomorphic theme overrides.
+   Soft flowing shapes, natural color fields, and asymmetric card edges.
+   =================================================================== */
+
+body {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--gb-primary-container) 38%, transparent), transparent 36%),
+    linear-gradient(315deg, color-mix(in srgb, var(--gb-secondary) 16%, transparent), transparent 42%),
+    var(--gb-surface);
+}
+
+.page {
+  max-width: min(calc(100% - var(--gb-gutter) - var(--gb-gutter)), 56rem);
+}
+
+.site-header {
+  border-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 42px 18px 36px 24px / 20px 38px 18px 44px;
+  background: var(--gb-surface-container-low);
+  box-shadow: var(--gb-shadow-1);
+}
+
+.site-header.is-scrolled {
+  border-color: var(--gb-outline-variant);
+  border-radius: 44px 22px 38px 26px / 22px 42px 20px 46px;
+  box-shadow: var(--gb-shadow-paper);
+}
+
+.dark .site-header.is-scrolled {
+  box-shadow: var(--gb-shadow-paper);
+}
+
+.site-logo,
+.post-card-title,
+.post-title,
+#page-title {
+  font-family: var(--gb-font-display);
+  font-weight: 720;
+}
+
+.site-logo-link {
+  color: var(--gb-primary);
+}
+
+.site-nav a {
+  border-radius: 9999px 28px 9999px 36px / 30px 9999px 32px 9999px;
+}
+
+.site-nav a:hover,
+.site-nav a[aria-current="page"] {
+  background: var(--gb-primary-container);
+  color: var(--gb-on-primary-container);
+}
+
+.theme-toggle,
+.rss-toggle,
+.nav-toggle,
+.fab-cluster .fab {
+  border: 1px solid var(--gb-outline-variant);
+  border-radius: 50% 42% 56% 45% / 45% 55% 42% 52%;
+  background: var(--gb-surface-container-low);
+  color: var(--gb-primary);
+  box-shadow: var(--gb-shadow-1);
+}
+
+.post-list {
+  gap: var(--gb-space-5);
+}
+
+.post-card,
+.dir-map-item,
+.giscus-fallback {
+  position: relative;
+  border-color: transparent;
+  border-radius: 34px 18px 38px 22px / 20px 40px 18px 36px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--gb-primary-container) 34%, transparent), transparent 48%),
+    var(--gb-surface-container-low);
+  box-shadow: var(--gb-shadow-paper);
+}
+
+.post-card:nth-child(even),
+.dir-map-item:nth-child(even) {
+  border-radius: 20px 42px 24px 36px / 42px 22px 38px 20px;
+}
+
+.post-card::before {
+  content: "";
+  position: absolute;
+  inset: auto var(--gb-space-4) var(--gb-space-4) auto;
+  width: 5rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--gb-secondary) 28%, transparent);
+  transform: rotate(-8deg);
+}
+
+.post-card-title {
+  color: var(--gb-on-surface);
+}
+
+.tag,
+.tag-cloud-item,
+.dir-count,
+.year-link {
+  border: 1px solid var(--gb-outline-variant);
+  border-radius: 9999px 24px 9999px 30px / 28px 9999px 24px 9999px;
+  background: var(--gb-primary-container);
+  color: var(--gb-on-primary-container);
+  padding: 2px var(--gb-space-2);
+  text-decoration: none;
+}
+
+.post-article,
+.giscus {
+  border-color: transparent;
+  border-radius: 48px 24px 42px 28px / 24px 48px 26px 44px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--gb-primary-container) 22%, transparent), transparent 14rem),
+    var(--gb-surface-container-lowest);
+  box-shadow: var(--gb-shadow-paper);
+}
+
+.dark .post-article,
+.dark .giscus {
+  box-shadow: var(--gb-shadow-paper);
+}
+
+.post-title {
+  max-width: 14ch;
+  line-height: 1.08;
+}
+
+.post-meta-row {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--gb-space-2) var(--gb-space-3);
+  border-radius: var(--gb-shape-full);
+  background: color-mix(in srgb, var(--gb-primary-container) 42%, transparent);
+}
+
+.prose :where(h2, h3) {
+  font-family: var(--gb-font-display);
+}
+
+.prose :where(h2)::after {
+  content: "";
+  display: block;
+  width: 4.5rem;
+  height: 0.45rem;
+  margin-top: var(--gb-space-2);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--gb-secondary) 48%, transparent);
+}
+
+.prose :where(blockquote) {
+  border: 0;
+  border-radius: 28px 16px 28px 18px / 16px 30px 18px 28px;
+  background: var(--gb-primary-container);
+  color: var(--gb-on-primary-container);
+  padding: var(--gb-space-4);
+}
+
+.post-article pre,
+post-toc,
+.rss-panel,
+.share-menu {
+  border-color: var(--gb-outline-variant);
+  border-radius: 22px 12px 20px 14px / 12px 22px 14px 20px;
+}
+
+reading-progress {
+  height: 5px;
+  background: linear-gradient(90deg, var(--gb-primary), var(--gb-secondary));
+}
+
+@media (max-width: 767px) {
+  .post-article,
+  .giscus {
+    border-radius: 30px 18px 28px 20px / 18px 30px 20px 28px;
+  }
+}
+
+/* Keep desktop TOC inside the viewport for wide custom theme measures. */
+@media (min-width: 1280px) {
+  post-toc {
+    left: max(var(--gb-space-3), calc(50% - var(--gb-measure) / 2 - var(--gb-toc-width) - var(--gb-space-5)));
+  }
+}

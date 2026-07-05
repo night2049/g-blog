@@ -6,6 +6,7 @@ import {
   buildItemBody,
   buildChannel,
   buildFeedItems,
+  writeFeeds,
 } from "../src/domain/feedService.ts";
 import { extractContentHtml } from "../src/domain/contentMarkers.ts";
 import { memFileStore, fixtureConfig } from "./fakes.ts";
@@ -37,16 +38,34 @@ describe("joinUrl", () => {
 });
 
 describe("absolutizeUrls", () => {
-  const base = "https://x.com";
+  const base = "https://x.com/post/";
   test("相对 src/href -> 绝对", () => {
-    expect(absolutizeUrls('<img src="assets/img/a.png">', base)).toContain('src="https://x.com/assets/img/a.png"');
-    expect(absolutizeUrls('<a href="b.html">', base)).toContain('href="https://x.com/b.html"');
+    expect(absolutizeUrls('<img src="assets/img/a.png">', base)).toContain('src="https://x.com/post/assets/img/a.png"');
+    expect(absolutizeUrls('<a href="b.html">', base)).toContain('href="https://x.com/post/b.html"');
+  });
+  test("只改真实元素属性, 不改正文文本", () => {
+    const html = '<p>assets/img/a.png</p><img src="assets/img/a.png">';
+    const out = absolutizeUrls(html, base);
+    expect(out).toContain("<p>assets/img/a.png</p>");
+    expect(out).toContain('src="https://x.com/post/assets/img/a.png"');
+  });
+  test("source srcset/video/audio 资源属性 -> 绝对", () => {
+    const out = absolutizeUrls(
+      '<picture><source src="a.avif" srcset="a-1.avif 1x, ../a-2.avif 2x"></picture><video poster="cover.png" src="v.mp4"></video><audio src="a.mp3"></audio>',
+      base,
+    );
+    expect(out).toContain('src="https://x.com/post/a.avif"');
+    expect(out).toContain('srcset="https://x.com/post/a-1.avif 1x, https://x.com/a-2.avif 2x"');
+    expect(out).toContain('poster="https://x.com/post/cover.png"');
+    expect(out).toContain('src="https://x.com/post/v.mp4"');
+    expect(out).toContain('src="https://x.com/post/a.mp3"');
   });
   test("绝对/协议相对/#/mailto/data 不变", () => {
     expect(absolutizeUrls('<a href="https://y.com/z">', base)).toContain('href="https://y.com/z"');
     expect(absolutizeUrls('<img src="//cdn/a.png">', base)).toContain('src="//cdn/a.png"');
     expect(absolutizeUrls('<a href="#sec">', base)).toContain('href="#sec"');
     expect(absolutizeUrls('<a href="mailto:a@b.c">', base)).toContain('href="mailto:a@b.c"');
+    expect(absolutizeUrls('<a href="tel:+123">', base)).toContain('href="tel:+123"');
     expect(absolutizeUrls('<img src="data:image/png;base64,xx">', base)).toContain('src="data:image/png;base64,xx"');
   });
 });
@@ -58,8 +77,8 @@ describe("buildItemBody", () => {
     expect(b.content).toBeUndefined();
   });
   test("summaryLength=0 -> 仅 content (绝对化)", () => {
-    const b = buildItemBody('<img src="a.png">', 0, "https://x.com");
-    expect(b.content).toContain('src="https://x.com/a.png"');
+    const b = buildItemBody('<img src="a.png">', 0, "https://x.com/post/");
+    expect(b.content).toContain('src="https://x.com/post/a.png"');
     expect(b.description).toBeUndefined();
   });
 });
@@ -101,8 +120,41 @@ describe("buildFeedItems", () => {
     const items = buildFeedItems({ manifest: m, fs, cfg });
     // count=2 -> 取 c,b; b 无标记跳过; a 超出 count
     expect(items.map((i) => i.title)).toEqual(["c"]);
-    expect(items[0].link).toBe("https://blog.example.com/c.html");
-    expect(items[0].id).toBe(items[0].link);
-    expect(items[0].description).toBe("cc");
+    expect(items[0]!.link).toBe("https://blog.example.com/c.html");
+    expect(items[0]!.id).toBe(items[0]!.link);
+    expect(items[0]!.description).toBe("cc");
+  });
+
+  test("全文模式使用文章 URL 所在目录作为正文资源 base", () => {
+    const cfg2 = fixtureConfig();
+    cfg2.rss.count = 1;
+    cfg2.rss.summaryLength = 0;
+    const fs = memFileStore({
+      "post/I_x.html": body(
+        '<p><img src="I_x/a.webp"><a href="relative.html">rel</a><a href="#sec">hash</a><a href="https://x.test/a">abs</a><a href="//cdn.test/a">cdn</a><a href="mailto:a@b.c">mail</a></p>',
+      ),
+    });
+    const items = buildFeedItems({
+      manifest: [{ url: "post/I_x.html", title: "x", date: "2026-01-01" }],
+      fs,
+      cfg: cfg2,
+    });
+    expect(items[0]!.content).toContain('src="https://blog.example.com/post/I_x/a.webp"');
+    expect(items[0]!.content).toContain('href="https://blog.example.com/post/relative.html"');
+    expect(items[0]!.content).toContain('href="#sec"');
+    expect(items[0]!.content).toContain('href="https://x.test/a"');
+    expect(items[0]!.content).toContain('href="//cdn.test/a"');
+    expect(items[0]!.content).toContain('href="mailto:a@b.c"');
+  });
+});
+
+describe("writeFeeds", () => {
+  test("formats 变化时删除未启用的旧 feed 文件", () => {
+    const fs = memFileStore({ "feed.xml": "OLD", "atom.xml": "OLD", "feed.json": "OLD" });
+    writeFeeds(fs, { rss: "<rss/>", atom: "<feed/>", json: "{}" }, ["rss"]);
+    const d = fs.dump();
+    expect(d["feed.xml"]).toBe("<rss/>");
+    expect("atom.xml" in d).toBe(false);
+    expect("feed.json" in d).toBe(false);
   });
 });
